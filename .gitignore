@@ -1,0 +1,10 @@
+# Python virtual environments - These should always be ignored
+venv/
+.venv/
+
+# Python cache files - These are auto-generated
+__pycache__/
+*.pyc
+
+# OS-specific files (good practice to include)
+.DS_Store

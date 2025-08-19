@@ -1,0 +1,26 @@
+# Core ML, Data Handling, and Utilities
+pandas
+numpy
+scikit-learn
+joblib
+
+# Deep Learning for Text Model (Hugging Face)
+transformers
+torch
+datasets
+
+# Gradient Boosting for Network Model
+xgboost
+
+# PE File Analysis
+pefile
+
+# API Framework
+fastapi
+uvicorn
+
+# NLP (for the Sensitive Data Classifier model)
+spacy
+
+# For making HTTP requests (downloading data, testing API)
+requests
