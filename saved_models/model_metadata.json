@@ -1,0 +1,78 @@
+{
+  "created_at": "2025-08-17T14:38:18.239175",
+  "training_data": {
+    "samples": 16000,
+    "test_samples": 4000,
+    "features": 39,
+    "attack_distribution": {
+      "Normal": 8476,
+      "DoS": 5747,
+      "Probe": 1279,
+      "R2L": 418,
+      "U2R": 80
+    }
+  },
+  "anomaly_detector": {
+    "model_path": "/content/drive/MyDrive/network_anomaly_detector.pkl",
+    "contamination": 0.47,
+    "threshold": 0.473671591233473,
+    "architecture": "Isolation Forest + Autoencoder Ensemble",
+    "test_accuracy": 0.619
+  },
+  "intrusion_detector": {
+    "model_path": "/content/drive/MyDrive/network_intrusion_detector.pkl",
+    "model_type": "xgboost",
+    "classes": [
+      "DoS",
+      "Normal",
+      "Probe",
+      "R2L",
+      "U2R"
+    ],
+    "test_accuracy": 1.0,
+    "selected_features": [
+      "duration",
+      "src_bytes",
+      "dst_bytes",
+      "service",
+      "flag",
+      "hot",
+      "num_failed_logins",
+      "logged_in",
+      "num_compromised",
+      "root_shell",
+      "su_attempted",
+      "num_root",
+      "num_file_creations",
+      "num_shells",
+      "is_guest_login",
+      "count",
+      "srv_count",
+      "serror_rate",
+      "rerror_rate",
+      "same_srv_rate",
+      "diff_srv_rate",
+      "dst_host_count",
+      "dst_host_diff_srv_rate",
+      "dst_host_serror_rate",
+      "dst_host_srv_rerror_rate"
+    ]
+  },
+  "performance_summary": {
+    "anomaly_detection": {
+      "ensemble_accuracy": 0.619,
+      "isolation_forest_accuracy": 0.62,
+      "autoencoder_accuracy": 0.53375
+    },
+    "intrusion_detection": {
+      "overall_accuracy": 1.0,
+      "per_class_f1": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  }
+}
