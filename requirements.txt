@@ -3,6 +3,11 @@ pandas
 numpy
 scikit-learn
 joblib
+tensorflow
+python-dateutil
+lightgbm
+matplotlib
+seaborn
 
 # Deep Learning for Text Model (Hugging Face)
 transformers
@@ -24,3 +29,5 @@ spacy
 
 # For making HTTP requests (downloading data, testing API)
 requests
+
+python-multipart
