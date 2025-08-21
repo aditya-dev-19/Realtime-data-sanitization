@@ -1,168 +1,98 @@
 # api/orchestrator.py
+import os
+# Force TensorFlow to use CPU to avoid CUDA errors on machines without a configured GPU
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+import sys
+from pathlib import Path
+import json
+
+# Add project root to the Python path to allow for absolute imports
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
+
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 import joblib 
-import os
+
+# Import your custom model classes to resolve the unpickling error
+from models.data_classification.sensitive_classifier import SensitiveDataClassifier
+from models.data_classification.quality_assessor import DataQualityAssessor
+
 
 class CybersecurityOrchestrator:
-    def __init__(self):
-        print("Loading models into memory...")
-
-        # --- Load Network Models ---
+    def __init__(self, model_dir='../saved_models/'):
+        print("Initializing Cybersecurity Orchestrator...")
+        
+        # 1. Load Dynamic Behavior Analyzer (LSTM)
         try:
-            # Load Network Anomaly Detector (Isolation Forest)
-            self.anomaly_model = joblib.load('../saved_models/isolation_forest_model.pkl')
-            print("✅ Network Anomaly Detector loaded.")
-        except Exception as e:
-            print(f"⚠️ Failed to load Network Anomaly Detector: {e}")
-            self.anomaly_model = None
-
-        try:
-            # Load Intrusion Detection System 
-            self.intrusion_model = joblib.load('../saved_models/intrusion_detection_model.pkl')
-            print("✅ Intrusion Detection System loaded.")
-        except Exception as e:
-            print(f"⚠️ Failed to load Intrusion Detection System: {e}")
-            self.intrusion_model = None
-
-        try:
-            # Load scalers if you used them during training
-            self.scaler = joblib.load('../saved_models/feature_scaler.pkl')
-            print("✅ Feature Scaler loaded.")
-        except Exception as e:
-            print(f"⚠️ Failed to load Feature Scaler: {e}")
-            self.scaler = None
-
-        # --- Load Dynamic Behavior Analyzer ---
-        try:
-            self.dynamic_model = load_model('../saved_models/dynamic_behavior_analyzer.h5')
-            self.sequence_length = 100 # Must be the same as used in training
+            self.dynamic_model = load_model(f'{model_dir}dynamic_behavior_analyzer.h5')
+            with open(f'{model_dir}model_metadata.json', 'r') as f:
+                self.dynamic_metadata = json.load(f)
+            self.sequence_length = self.dynamic_metadata['sequence_length']
             print("✅ Dynamic Behavior Analyzer loaded.")
         except Exception as e:
-            print(f"⚠️ Failed to load Dynamic Behavior Analyzer: {e}")
-            self.dynamic_model = None
+            print(f"❌ ERROR loading Dynamic Behavior Analyzer: {e}")
 
-    def predict_network_anomaly(self, features):
-        """
-        Predicts if network traffic is anomalous using Isolation Forest.
-        :param features: A list of numerical features representing network traffic
-        :return: Dictionary with prediction result
-        """
-        if self.anomaly_model is None:
-            return {"error": "Network Anomaly Detector not available"}
+        # 2. Load Network Traffic Models
+        try:
+            self.iso_forest = joblib.load(f'{model_dir}isolation_forest_model.pkl')
+            self.ids_model = joblib.load(f'{model_dir}intrusion_detection_model.pkl')
+            self.network_scaler = joblib.load(f'{model_dir}feature_scaler.pkl')
+            print("✅ Network Traffic models loaded.")
+        except Exception as e:
+            print(f"❌ ERROR loading Network Traffic models: {e}")
+
+        # 3. Load Data Classification Models
+        try:
+            self.sensitive_classifier = joblib.load(f'{model_dir}classifier.pkl')
+            self.quality_assessor = joblib.load(f'{model_dir}assessor.pkl')
+            # Assuming metadata.json is for the sensitive classifier
+            with open(f'{model_dir}metadata.json', 'r') as f:
+                self.sensitive_metadata = json.load(f)
+            print("✅ Data Classification models loaded.")
+        except Exception as e:
+            print(f"❌ ERROR loading Data Classification models: {e}")
+
+        print("\n🚀 Orchestrator ready!")
+
+    def analyze_dynamic_behavior(self, call_sequence: list[int]):
+        """Analyzes a sequence of system calls with the LSTM model."""
+        padded_sequence = pad_sequences([call_sequence], maxlen=self.sequence_length, padding='post', truncating='post')
+        prediction_prob = self.dynamic_model.predict(padded_sequence)[0][0]
         
-        try:
-            # Convert to numpy array and reshape for single prediction
-            feature_array = np.array(features).reshape(1, -1)
-            
-            # Scale features if scaler is available
-            if self.scaler is not None:
-                feature_array = self.scaler.transform(feature_array)
-            
-            # Make prediction (-1 for anomaly, 1 for normal)
-            prediction = self.anomaly_model.predict(feature_array)[0]
-            
-            # Get anomaly score (lower scores indicate more anomalous)
-            anomaly_score = self.anomaly_model.decision_function(feature_array)[0]
-            
-            if prediction == -1:
-                return {
-                    "status": "Anomaly Detected",
-                    "prediction": "Anomalous",
-                    "anomaly_score": float(anomaly_score),
-                    "confidence": abs(float(anomaly_score))
-                }
-            else:
-                return {
-                    "status": "Normal Traffic",
-                    "prediction": "Normal",
-                    "anomaly_score": float(anomaly_score),
-                    "confidence": float(anomaly_score)
-                }
-                
-        except Exception as e:
-            return {"error": f"Error in anomaly prediction: {str(e)}"}
+        if prediction_prob > 0.5:
+            return {"status": "Attack Behavior Detected", "confidence": float(prediction_prob)}
+        else:
+            return {"status": "Normal Behavior", "confidence": 1.0 - float(prediction_prob)}
 
-    def classify_network_intrusion(self, features):
-        """
-        Classifies the type of network intrusion.
-        :param features: A list of numerical features representing network traffic
-        :return: Dictionary with classification result
-        """
-        if self.intrusion_model is None:
-            return {"error": "Intrusion Detection System not available"}
+    def analyze_network_traffic(self, features: list[float]):
+        """Analyzes network features with both anomaly and intrusion detection models."""
+        features_2d = np.array(features).reshape(1, -1)
+        scaled_features = self.network_scaler.transform(features_2d)
         
-        try:
-            # Convert to numpy array and reshape for single prediction
-            feature_array = np.array(features).reshape(1, -1)
-            
-            # Scale features if scaler is available
-            if self.scaler is not None:
-                feature_array = self.scaler.transform(feature_array)
-            
-            # Make prediction
-            prediction = self.intrusion_model.predict(feature_array)[0]
-            
-            # Get prediction probabilities if available
-            if hasattr(self.intrusion_model, 'predict_proba'):
-                probabilities = self.intrusion_model.predict_proba(feature_array)[0]
-                max_prob = float(np.max(probabilities))
-            else:
-                max_prob = None
-            
-            # Define attack type mapping (adjust based on your training labels)
-            attack_types = {
-                0: "Normal",
-                1: "DoS Attack", 
-                2: "Probe Attack",
-                3: "R2L Attack",
-                4: "U2R Attack"
-            }
-            
-            attack_type = attack_types.get(prediction, "Unknown")
-            
-            result = {
-                "prediction": attack_type,
-                "prediction_code": int(prediction),
-                "status": "Attack Detected" if prediction != 0 else "Normal Traffic"
-            }
-            
-            if max_prob is not None:
-                result["confidence"] = max_prob
-                
-            return result
-            
-        except Exception as e:
-            return {"error": f"Error in intrusion classification: {str(e)}"}
+        # Anomaly Detection
+        anomaly_prediction = self.iso_forest.predict(scaled_features)
+        anomaly_status = "Anomaly" if anomaly_prediction[0] == -1 else "Normal"
+        
+        # Intrusion Classification
+        intrusion_prediction = self.ids_model.predict(scaled_features)
+        
+        return {
+            "anomaly_detection": {"status": anomaly_status},
+            "intrusion_classification": {"attack_type": intrusion_prediction[0]}
+        }
 
-    def analyze_system_calls(self, call_sequence):
-        """
-        Analyzes a sequence of system calls to detect threats.
-        :param call_sequence: A list of integers representing system calls. e.g., [10, 45, 192, ...]
-        """
-        if self.dynamic_model is None:
-            return {"error": "Dynamic Behavior Analyzer not available"}
-            
-        try:
-            # 1. Pad the new sequence to the required length
-            padded_sequence = pad_sequences([call_sequence], maxlen=self.sequence_length, padding='post', truncating='post')
+    def classify_sensitive_data(self, text: str):
+        """Classifies text to identify sensitive data."""
+        prediction = self.sensitive_classifier.predict([text])
+        # Assuming the model returns a label directly
+        return {"data_type": prediction[0], "details": "Model classified text content."}
 
-            # 2. Make a prediction
-            prediction_prob = self.dynamic_model.predict(padded_sequence)[0][0]
-
-            # 3. Interpret the result
-            if prediction_prob > 0.5:
-                return {
-                    "status": "Attack",
-                    "confidence": float(prediction_prob),
-                    "prediction": "Malicious Behavior Detected"
-                }
-            else:
-                return {
-                    "status": "Normal",
-                    "confidence": 1.0 - float(prediction_prob),
-                    "prediction": "Normal Behavior"
-                }
-        except Exception as e:
-            return {"error": f"Error in system call analysis: {str(e)}"}
+    def assess_data_quality(self, features: list[float]):
+        """Assesses the quality of a given data sample."""
+        features_2d = np.array(features).reshape(1, -1)
+        quality_score = self.quality_assessor.predict(features_2d)
+        
+        return {"quality_score": quality_score[0], "recommendation": "Review data if score is low."}
