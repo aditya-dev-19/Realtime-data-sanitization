@@ -1,0 +1,18 @@
+{
+  "model_name": "DataQualityAssessor",
+  "version": "1.0",
+  "capabilities": [
+    "completeness",
+    "consistency",
+    "outliers",
+    "uniqueness"
+  ],
+  "assessment_types": {
+    "completeness": "Missing values detection and analysis",
+    "consistency": "Data type and format validation",
+    "outliers": "Statistical anomaly identification using IQR and Z-score",
+    "uniqueness": "Duplicate detection and uniqueness scoring"
+  },
+  "scoring": "Weighted average with letter grades (A-F)",
+  "created_date": "2025-08-16T08:12:34.789490"
+}
