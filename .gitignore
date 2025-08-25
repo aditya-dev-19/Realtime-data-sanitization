@@ -4,6 +4,11 @@ venv/
 .venv/
 env/
 
+# --- Secrets ---
+# Never commit environment variables or secret keys
+.env
+*.env.*
+
 # --- Python Cache & Build Artifacts ---
 # These are auto-generated
 __pycache__/
@@ -14,18 +19,20 @@ build/
 dist/
 *.egg-info/
 
-# --- Secrets ---
-# Never commit environment variables or secret keys
-.env
-*.env.*
-
 # --- IDE & Editor Folders ---
 # Visual Studio Code
 .vscode/
+# PyCharm
+.idea/
 
 # --- Temporary Files ---
 # Directory for temporary file uploads from the API
 tmp/
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
 
 # --- OS-specific files ---
 # macOS

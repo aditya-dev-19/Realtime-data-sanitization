@@ -3,8 +3,8 @@
 import os
 import shutil
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
 import json
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,7 @@ db.Base.metadata.create_all(bind=db.engine)
 
 app = FastAPI(
     title="AI Cybersecurity Threat Detection API",
-    description="An API that uses a suite of AI models to detect various cyber threats.",
+    description="An API that uses a suite of AI models to detect various cyber threats and govern data.",
     version="1.0.0",
 )
 
@@ -41,8 +41,10 @@ class QualityData(BaseModel):
     features: List[float]
 
 class JsonData(BaseModel):
-    data: dict
+    data: Dict[str, Any] = Field(..., description="A valid JSON object to be assessed for data quality.")
 
+class SystemCalls(BaseModel):
+    call_sequence: List[int]
 
 # --- Define API Endpoints ---
 
@@ -64,22 +66,6 @@ def network_analysis(data: NetworkData):
     """Analyzes a vector of network features for anomalies and known attack types."""
     try:
         return orchestrator.analyze_network_traffic(data.features)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/classify-sensitive-data", tags=["Data Classification"])
-def sensitive_data_analysis(data: TextData):
-    """Classifies text to identify sensitive data."""
-    try:
-        return orchestrator.classify_sensitive_data(data.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/assess-data-quality", tags=["Data Classification"])
-def data_quality_analysis(data: QualityData):
-    """Assesses the quality of a given data sample."""
-    try:
-        return orchestrator.assess_data_quality(data.features)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -146,7 +132,7 @@ async def analyze_file(db_session: Session = Depends(db.get_db), file: UploadFil
         db_session.commit()
 
         return {"analysis_type": "Static File Analysis", "result": result}
-
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during file analysis: {e}")
     finally:
@@ -155,6 +141,59 @@ async def analyze_file(db_session: Session = Depends(db.get_db), file: UploadFil
             os.remove(temp_file_path)
 
 
+# --- Enhanced Threat Detection Endpoints ---
+@app.post("/detect-phishing", tags=["Threat Detection"])
+def detect_phishing(data: TextData):
+    """Analyzes a string of text for potential phishing threats."""
+    try:
+        result = orchestrator.detect_phishing(data.text)
+        return {"analysis_type": "Phishing Detection", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/detect-code-injection", tags=["Threat Detection"])
+def detect_code_injection(data: TextData):
+    """Analyzes a string of text (e.g., code snippet) for injection threats."""
+    try:
+        result = orchestrator.detect_code_injection(data.text)
+        return {"analysis_type": "Code Injection Detection", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analyze-system-calls", tags=["Threat Detection"])
+def analyze_system_calls(data: SystemCalls):
+    """Analyzes a sequence of system calls for behavioral threats."""
+    try:
+        return orchestrator.analyze_system_calls(data.call_sequence)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Data Classification Endpoints ---
+@app.post("/classify-sensitive-data", tags=["Data Classification"])
+def classify_sensitive_data(data: TextData):
+    """Classifies text to identify sensitive data."""
+    try:
+        return orchestrator.classify_sensitive_data(data.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/assess-data-quality", tags=["Data Classification"])
+def assess_data_quality_features(data: QualityData):
+    """Assesses the quality of a given data sample using feature array."""
+    try:
+        return orchestrator.assess_data_quality(data.features)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/assess-json-quality", tags=["Data Classification"])
+def assess_json_quality(payload: JsonData):
+    """Assesses the quality of JSON data using enhanced quality assessor."""
+    try:
+        return orchestrator.assess_data_quality(payload.data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JSON quality assessment failed: {e}")
+
+# --- Enhanced Analysis Endpoints ---
 @app.post("/comprehensive-analysis", tags=["Enhanced Analysis"])
 def comprehensive_analysis(data: TextData, db_session: Session = Depends(db.get_db)):
     """
@@ -180,7 +219,15 @@ def comprehensive_analysis(data: TextData, db_session: Session = Depends(db.get_
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comprehensive analysis failed: {e}")
 
+@app.post("/comprehensive-data-analysis", tags=["Enhanced Analysis"])
+def comprehensive_data_analysis(data: TextData):
+    """Performs both sensitive data classification and quality assessment on text."""
+    try:
+        return orchestrator.comprehensive_data_analysis(data.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred during comprehensive analysis: {e}")
 
+# --- System Monitoring Endpoints ---
 @app.get("/health", tags=["System"])
 def health_check():
     """
@@ -191,6 +238,13 @@ def health_check():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Health check failed: {e}")
 
+@app.get("/health-data-services", tags=["System"])
+def get_health_status():
+    """Checks the health of the data classification and quality models."""
+    try:
+        return orchestrator.get_data_services_health()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred during health check: {e}")
 
 @app.get("/model-stats", tags=["System"])
 def get_model_stats():
@@ -201,14 +255,3 @@ def get_model_stats():
         return orchestrator.get_model_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model stats: {e}")
-
-
-@app.post("/assess-json-quality", tags=["Enhanced Analysis"])
-def assess_json_quality(data: dict):
-    """
-    Assesses the quality of JSON data using enhanced quality assessor.
-    """
-    try:
-        return orchestrator.assess_data_quality(data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"JSON quality assessment failed: {e}")
