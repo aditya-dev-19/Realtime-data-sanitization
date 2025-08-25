@@ -258,3 +258,20 @@ class DataQualityAssessor:
             return f"Dataset quality is excellent (Grade {grade}). Ready for analysis."
         else:
             return f"Dataset quality is {grade}. Main issues: {', '.join(issues)}."
+    
+    def predict(self, features):
+        """Predict method for compatibility with orchestrator"""
+        if len(features.shape) == 1:
+            features = features.reshape(1, -1)
+        
+        # Generate a quality score based on the features
+        # This is a simplified approach - in practice, you'd train a proper model
+        scores = []
+        for feature_row in features:
+            # Simple heuristic: normalize features and calculate a quality score
+            normalized_features = np.abs(feature_row)
+            # Assume lower variance and values closer to mean indicate better quality
+            quality_score = max(0.0, min(1.0, 1.0 - np.std(normalized_features) / (np.mean(normalized_features) + 1e-6)))
+            scores.append(quality_score)
+        
+        return np.array(scores)

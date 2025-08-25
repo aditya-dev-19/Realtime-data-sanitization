@@ -16,8 +16,12 @@ class SensitiveDataClassifier:
         """Initialize the classifier with spaCy model and regex patterns"""
         try:
             self.nlp = spacy.load("en_core_web_sm")
+            self.spacy_available = True
         except OSError:
-            raise OSError("spaCy English model not found. Install with: python -m spacy download en_core_web_sm")
+            print("⚠️  spaCy English model not found. Name detection will be disabled.")
+            print("   To enable full functionality, install with: python -m spacy download en_core_web_sm")
+            self.nlp = None
+            self.spacy_available = False
         
         # Priority map for de-duplicating overlapping findings
         self.pattern_priority = {
@@ -82,10 +86,12 @@ class SensitiveDataClassifier:
         for match in self.ssn_pattern.finditer(text):
             findings.append({'type': 'ssn', 'value': match.group(), 'start': match.start(), 'end': match.end()})
             
-        doc = self.nlp(text)
-        for ent in doc.ents:
-            if ent.label_ == "PERSON":
-                findings.append({'type': 'name', 'value': ent.text, 'start': ent.start_char, 'end': ent.end_char})
+        # Only use spaCy if available
+        if self.spacy_available and self.nlp:
+            doc = self.nlp(text)
+            for ent in doc.ents:
+                if ent.label_ == "PERSON":
+                    findings.append({'type': 'name', 'value': ent.text, 'start': ent.start_char, 'end': ent.end_char})
         return findings
     
     def detect_financial(self, text: str) -> List[Dict[str, Any]]:
@@ -207,3 +213,15 @@ class SensitiveDataClassifier:
             return "No sensitive data detected"
         else:
             return f"Detected: {', '.join(sorted(list(found_types)))}"
+    
+    def predict(self, texts):
+        """Predict method for compatibility with orchestrator"""
+        if isinstance(texts, str):
+            texts = [texts]
+        
+        results = []
+        for text in texts:
+            classification_result = self.classify(text)
+            results.append(classification_result['classification'])
+        
+        return results

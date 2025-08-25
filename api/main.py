@@ -40,6 +40,9 @@ class TextData(BaseModel):
 class QualityData(BaseModel):
     features: List[float]
 
+class JsonData(BaseModel):
+    data: dict
+
 
 # --- Define API Endpoints ---
 
@@ -93,7 +96,7 @@ def analyze_text(data: TextData, db_session: Session = Depends(db.get_db)):
         log_entry = db.AnalysisResult(
             file_name="N/A (Text Input)",
             analysis_type="Text Analysis",
-            is_malicious=sensitive_result.get('is_sensitive', False), # Treat sensitive as "malicious" for this context
+            is_malicious=sensitive_result.get('classification') in ['SENSITIVE', 'PII', 'Financial', 'Secrets'], 
             confidence_score=sensitive_result.get('confidence'),
             analysis_details=json.dumps({
                 "sensitive_analysis": sensitive_result,
@@ -150,3 +153,62 @@ async def analyze_file(db_session: Session = Depends(db.get_db), file: UploadFil
         # Clean up by removing the temporary file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+@app.post("/comprehensive-analysis", tags=["Enhanced Analysis"])
+def comprehensive_analysis(data: TextData, db_session: Session = Depends(db.get_db)):
+    """
+    Performs comprehensive analysis using enhanced models with detailed insights.
+    """
+    try:
+        result = orchestrator.comprehensive_analysis(data.text)
+        
+        # Log to database
+        sensitivity_info = result.get('sensitivity_analysis', {})
+        log_entry = db.AnalysisResult(
+            file_name="N/A (Comprehensive Text Analysis)",
+            analysis_type="Comprehensive Analysis",
+            is_malicious=sensitivity_info.get('classification') in ['SENSITIVE', 'PII', 'Financial', 'Secrets'],
+            confidence_score=sensitivity_info.get('confidence', 0.0),
+            analysis_details=json.dumps(result)
+        )
+        db_session.add(log_entry)
+        db_session.commit()
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Comprehensive analysis failed: {e}")
+
+
+@app.get("/health", tags=["System"])
+def health_check():
+    """
+    Performs a health check on all system components.
+    """
+    try:
+        return orchestrator.health_check()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Health check failed: {e}")
+
+
+@app.get("/model-stats", tags=["System"])
+def get_model_stats():
+    """
+    Returns performance statistics for the models.
+    """
+    try:
+        return orchestrator.get_model_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get model stats: {e}")
+
+
+@app.post("/assess-json-quality", tags=["Enhanced Analysis"])
+def assess_json_quality(data: dict):
+    """
+    Assesses the quality of JSON data using enhanced quality assessor.
+    """
+    try:
+        return orchestrator.assess_data_quality(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JSON quality assessment failed: {e}")

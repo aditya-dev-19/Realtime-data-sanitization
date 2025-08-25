@@ -1,9 +1,9 @@
 # Core ML, Data Handling, and Utilities
 pandas
-numpy
-scikit-learn
+numpy==2.1.3
+scikit-learn==1.6.1
 joblib
-tensorflow
+tensorflow==2.19.0
 python-dateutil
 lightgbm
 matplotlib
