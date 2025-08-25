@@ -71,7 +71,7 @@ echo -e "\n"
 echo "11. Testing JSON quality assessment (Enhanced)..."
 curl -X POST http://127.0.0.1:8000/assess-json-quality \
   -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "email": "john@example.com", "age": 30, "city": "New York", "salary": null}'
+  -d '{"data": {"name": "John Doe", "email": "john@example.com", "age": 30, "city": "New York", "salary": null}}'
 echo -e "\n"
 
 # Test 12: File analysis
