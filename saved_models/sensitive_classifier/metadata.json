@@ -1,0 +1,24 @@
+{
+  "model_name": "SensitiveDataClassifier",
+  "version": "1.0",
+  "capabilities": [
+    "PII",
+    "Financial",
+    "Secrets"
+  ],
+  "pii_types": [
+    "email",
+    "phone",
+    "ssn",
+    "name"
+  ],
+  "financial_types": [
+    "credit_card",
+    "bank_account"
+  ],
+  "secrets_types": [
+    "api_key",
+    "password"
+  ],
+  "created_date": "2025-08-16T07:22:56.308442"
+}
