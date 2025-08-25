@@ -188,7 +188,7 @@ class CybersecurityOrchestrator:
             
             return {
                 "anomaly_detection": {"status": anomaly_status},
-                "intrusion_classification": {"attack_type": intrusion_prediction[0]}
+                "intrusion_classification": {"attack_type": str(intrusion_prediction[0])}
             }
         except Exception as e:
             return {"error": str(e), "status": "Analysis failed"}
