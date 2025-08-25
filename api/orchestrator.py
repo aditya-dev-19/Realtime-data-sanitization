@@ -6,6 +6,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 import sys
 from pathlib import Path
 import json
+from datetime import datetime
 
 # Add project root to the Python path to allow for absolute imports
 project_root = Path(__file__).resolve().parent.parent
@@ -15,7 +16,10 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 import joblib
-from datetime import datetime 
+
+# Import transformer models
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
 
 # Import your custom model classes to resolve the unpickling error
 from models.data_classification.sensitive_classifier import SensitiveDataClassifier
@@ -24,7 +28,6 @@ from models.data_classification.quality_assessor import DataQualityAssessor
 from models.data_classification.enhanced_models import EnhancedSensitiveClassifier, DataQualityAssessor as EnhancedDataQualityAssessor
 from models.data_classification.api_interface import DataClassificationAPI
 from models.data_classification.config import ClassifierConfig, QualityConfig
-
 
 class CybersecurityOrchestrator:
     def __init__(self, model_dir='../saved_models/'):
@@ -63,8 +66,36 @@ class CybersecurityOrchestrator:
             self.ids_model = None
             self.network_scaler = None
 
-        # 3. Load Data Classification Models
-        # Use enhanced models with API interface for better performance
+        # 3. Load Transformer Models (Phishing & Code Injection Detection)
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent
+        
+        phishing_model_path = project_root / "saved_models" / "phishing_model_v2"
+        code_injection_model_path = project_root / "saved_models" / "code_injection_model_prod"
+        
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"🧠 Using device: {self.device}")
+
+        try:
+            self.phishing_tokenizer = AutoTokenizer.from_pretrained(phishing_model_path)
+            self.phishing_model = AutoModelForSequenceClassification.from_pretrained(phishing_model_path)
+            self.phishing_model.to(self.device)
+            print("✅ Phishing Detection Model loaded.")
+
+            self.code_injection_tokenizer = AutoTokenizer.from_pretrained(code_injection_model_path)
+            self.code_injection_model = AutoModelForSequenceClassification.from_pretrained(code_injection_model_path)
+            self.code_injection_model.to(self.device)
+            print("✅ Code Injection Detection Model loaded.")
+
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to load Transformer models: {e}")
+            print("   Transformer-based detection will be disabled")
+            self.phishing_tokenizer = None
+            self.phishing_model = None
+            self.code_injection_tokenizer = None
+            self.code_injection_model = None
+
+        # 4. Load Data Classification Models
         print("🚀 Initializing Enhanced Data Classification Models...")
         
         try:
@@ -86,7 +117,8 @@ class CybersecurityOrchestrator:
             self.sensitive_metadata = {
                 "note": "Using enhanced model instances with API interface",
                 "enhanced_features": True,
-                "api_interface": True
+                "api_interface": True,
+                "transformer_models": bool(self.phishing_model and self.code_injection_model)
             }
             print("✅ Enhanced Data Classification models initialized successfully.")
             
@@ -327,3 +359,53 @@ class CybersecurityOrchestrator:
             status.update(api_health)
             
         return status
+    
+    def detect_phishing(self, text: str):
+        """Analyzes text to detect phishing attempts using a transformer model."""
+        if not self.phishing_model or not self.phishing_tokenizer:
+            return {"error": "Phishing detection model not available", "status": "Model unavailable"}
+        
+        try:
+            inputs = self.phishing_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            with torch.no_grad():
+                outputs = self.phishing_model(**inputs)
+                logits = outputs.logits
+                probabilities = torch.softmax(logits, dim=-1)
+                prediction = torch.argmax(probabilities, dim=-1).item()
+            confidence = probabilities[0, prediction].item()
+            label = self.phishing_model.config.id2label[prediction]
+            return {"status": label, "confidence": confidence}
+        except Exception as e:
+            return {"error": f"Phishing detection failed: {str(e)}", "status": "Analysis failed"}
+
+    def detect_code_injection(self, text: str):
+        """Analyzes text to detect code injection attempts using a transformer model."""
+        if not self.code_injection_model or not self.code_injection_tokenizer:
+            return {"error": "Code injection detection model not available", "status": "Model unavailable"}
+        
+        try:
+            inputs = self.code_injection_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            with torch.no_grad():
+                outputs = self.code_injection_model(**inputs)
+                logits = outputs.logits
+                probabilities = torch.softmax(logits, dim=-1)
+                prediction = torch.argmax(probabilities, dim=-1).item()
+            confidence = probabilities[0, prediction].item()
+            label = self.code_injection_model.config.id2label[prediction]
+            return {"status": label, "confidence": confidence}
+        except Exception as e:
+            return {"error": f"Code injection detection failed: {str(e)}", "status": "Analysis failed"}
+
+    def analyze_system_calls(self, call_sequence):
+        """Analyzes system calls - alias for analyze_dynamic_behavior for backward compatibility."""
+        return self.analyze_dynamic_behavior(call_sequence)
+    
+    def comprehensive_data_analysis(self, text: str):
+        """Alias for comprehensive_analysis for backward compatibility."""
+        return self.comprehensive_analysis(text)
+
+    def get_data_services_health(self):
+        """Alias for health_check for backward compatibility."""
+        return self.health_check()
