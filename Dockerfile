@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy the requirements file first to leverage Docker's layer caching
 COPY requirements.txt .
 
-# Install all the Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Increase the timeout for pip to handle slow connections
+RUN pip install --default-timeout=600 --no-cache-dir -r requirements.txt
 RUN python -m spacy download en_core_web_sm
 
 # Copy your entire project into the container
