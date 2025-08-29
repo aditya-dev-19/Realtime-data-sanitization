@@ -1,0 +1,19 @@
+# Python virtual environments - These should always be ignored
+venv/
+.venv/
+
+# Python cache files - These are auto-generated and can cause issues
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS-specific files (good practice to include)
+.DS_Store
+
+# Git directory - Never include your Git history in the image
+.git/
+
+# IDE-specific folders
+.vscode/
+.idea/
