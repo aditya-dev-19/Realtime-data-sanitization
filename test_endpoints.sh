@@ -3,81 +3,96 @@
 echo "🚀 Starting AI Cybersecurity API Testing..."
 echo "=========================================="
 
+# Auto-detect Docker port if container is running
+DOCKER_PORT=$(docker ps --filter "ancestor=us-central1-docker.pkg.dev/realtime-data-sanitization/my-api-repo/cybersecurity-api:latest" --format "{{.Ports}}" | sed -n 's/.*:\([0-9]\+\)->8080.*/\1/p")
+
+if [ -n "$DOCKER_PORT" ]; then
+  BASE_URL="http://127.0.0.1:$DOCKER_PORT"
+  echo "🐳 Detected Docker container running on port $DOCKER_PORT"
+else
+  # Fallback: use provided BASE_URL or default to local FastAPI port 8000
+  BASE_URL=${BASE_URL:-http://127.0.0.1:8000}
+  echo "⚠️  No running Docker container detected. Using BASE_URL=$BASE_URL"
+fi
+
+echo "Testing against $BASE_URL"
+echo "------------------------------------------"
+
 # Test 1: Root endpoint
 echo "1. Testing root endpoint..."
-curl -X GET http://127.0.0.1:8000/
+curl -s -X GET $BASE_URL/ | jq .
 echo -e "\n"
 
 # Test 2: Health check
 echo "2. Testing health check..."
-curl -X GET http://127.0.0.1:8000/health
+curl -s -X GET $BASE_URL/health | jq .
 echo -e "\n"
 
 # Test 3: Model stats
 echo "3. Testing model statistics..."
-curl -X GET http://127.0.0.1:8000/model-stats
+curl -s -X GET $BASE_URL/model-stats | jq .
 echo -e "\n"
 
 # Test 4: Dynamic behavior analysis
 echo "4. Testing dynamic behavior analysis..."
-curl -X POST http://127.0.0.1:8000/analyze-dynamic-behavior \
+curl -s -X POST $BASE_URL/analyze-dynamic-behavior \
   -H "Content-Type: application/json" \
-  -d '{"call_sequence": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}'
+  -d '{"call_sequence": [1,2,3,4,5,6,7,8,9,10]}' | jq .
 echo -e "\n"
 
 # Test 5: Network traffic analysis
 echo "5. Testing network traffic analysis..."
-curl -X POST http://127.0.0.1:8000/analyze-network-traffic \
+curl -s -X POST $BASE_URL/analyze-network-traffic \
   -H "Content-Type: application/json" \
-  -d '{"features": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}'
+  -d '{"features": [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]}' | jq .
 echo -e "\n"
 
 # Test 6: Sensitive data classification (PII)
 echo "6. Testing sensitive data classification (PII)..."
-curl -X POST http://127.0.0.1:8000/classify-sensitive-data \
+curl -s -X POST $BASE_URL/classify-sensitive-data \
   -H "Content-Type: application/json" \
-  -d '{"text": "Contact John Doe at john.doe@example.com or call 555-123-4567"}'
+  -d '{"text": "Contact John Doe at john.doe@example.com or call 555-123-4567"}' | jq .
 echo -e "\n"
 
 # Test 7: Sensitive data classification (Financial)
 echo "7. Testing sensitive data classification (Financial)..."
-curl -X POST http://127.0.0.1:8000/classify-sensitive-data \
+curl -s -X POST $BASE_URL/classify-sensitive-data \
   -H "Content-Type: application/json" \
-  -d '{"text": "My credit card number is 4532-1234-5678-9012"}'
+  -d '{"text": "My credit card number is 4532-1234-5678-9012"}' | jq .
 echo -e "\n"
 
 # Test 8: Data quality assessment
 echo "8. Testing data quality assessment..."
-curl -X POST http://127.0.0.1:8000/assess-data-quality \
+curl -s -X POST $BASE_URL/assess-data-quality \
   -H "Content-Type: application/json" \
-  -d '{"features": [0.8, 0.9, 0.7, 0.85, 0.92]}'
+  -d '{"features": [0.8,0.9,0.7,0.85,0.92]}' | jq .
 echo -e "\n"
 
 # Test 9: Text analysis
 echo "9. Testing text analysis..."
-curl -X POST http://127.0.0.1:8000/analyze-text \
+curl -s -X POST $BASE_URL/analyze-text \
   -H "Content-Type: application/json" \
-  -d '{"text": "Employee ID: 12345, SSN: 123-45-6789, Email: employee@company.com"}'
+  -d '{"text": "Employee ID: 12345, SSN: 123-45-6789, Email: employee@company.com"}' | jq .
 echo -e "\n"
 
 # Test 10: Comprehensive analysis (Enhanced)
 echo "10. Testing comprehensive analysis (Enhanced)..."
-curl -X POST http://127.0.0.1:8000/comprehensive-analysis \
+curl -s -X POST $BASE_URL/comprehensive-analysis \
   -H "Content-Type: application/json" \
-  -d '{"text": "API Key: sk-1234567890abcdef, Phone: +1-555-123-4567, URL: https://api.example.com"}'
+  -d '{"text": "API Key: sk-1234567890abcdef, Phone: +1-555-123-4567, URL: https://api.example.com"}' | jq .
 echo -e "\n"
 
 # Test 11: JSON quality assessment (Enhanced)
 echo "11. Testing JSON quality assessment (Enhanced)..."
-curl -X POST http://127.0.0.1:8000/assess-json-quality \
+curl -s -X POST $BASE_URL/assess-json-quality \
   -H "Content-Type: application/json" \
-  -d '{"data": {"name": "John Doe", "email": "john@example.com", "age": 30, "city": "New York", "salary": null}}'
+  -d '{"data": {"name": "John Doe", "email": "john@example.com", "age": 30, "city": "New York", "salary": null}}' | jq .
 echo -e "\n"
 
 # Test 12: File analysis
 echo "12. Testing file analysis..."
 echo "This is a test file with sensitive data: john@example.com and SSN: 123-45-6789" > test_file.txt
-curl -X POST http://127.0.0.1:8000/analyze-file -F "file=@test_file.txt"
+curl -s -X POST $BASE_URL/analyze-file -F "file=@test_file.txt" | jq .
 rm test_file.txt
 echo -e "\n"
 
