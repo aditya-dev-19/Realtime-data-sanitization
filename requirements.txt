@@ -23,6 +23,7 @@ pefile
 # API Framework
 fastapi
 uvicorn
+sqlalchemy
 
 # NLP (for the Sensitive Data Classifier model)
 spacy
