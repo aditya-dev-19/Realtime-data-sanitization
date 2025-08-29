@@ -14,8 +14,8 @@ RUN python -m spacy download en_core_web_sm
 # Copy your entire project into the container
 COPY . /app/
 
-# Tell Docker that your application listens on port 8000
-EXPOSE 8000
+# Expose the port Cloud Run expects
+EXPOSE 8080
 
-# The command to run when the container starts
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# Use the PORT env var (injected by Cloud Run)
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
