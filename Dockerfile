@@ -1,28 +1,27 @@
 FROM python:3.11-slim
 
-# Set the working directory inside container
 WORKDIR /app
 
-# Install system dependencies (for some Python libs like SQLAlchemy, psycopg2, etc.)
+# Install system deps
 RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
+    gcc libpq-dev git curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for layer caching)
+# Copy requirements and install
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the whole project (this brings in api/, saved_models/, etc.)
-COPY . .
+# Install spaCy English model
+RUN python -m spacy download en_core_web_sm
 
-# Set working directory to api (since you run uvicorn from there)
-WORKDIR /app/api
+# Copy project code + models
+COPY api/ /app/api/
+COPY models/ /app/models/
+COPY saved_models/ /app/saved_models/
 
-# Expose FastAPI port
+# Expose Cloud Run port
 EXPOSE 8080
 
-# Run FastAPI (production mode)
+# Run FastAPI
+WORKDIR /app/api
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
