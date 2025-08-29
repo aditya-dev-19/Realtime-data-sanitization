@@ -1,21 +1,28 @@
-# Use an official Python runtime as a base image
 FROM python:3.11-slim
 
-# Set the working directory inside the container
+# Set the working directory inside container
 WORKDIR /app
 
-# Copy the requirements file first to leverage Docker's layer caching
+# Install system dependencies (for some Python libs like SQLAlchemy, psycopg2, etc.)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (for layer caching)
 COPY requirements.txt .
 
-# Increase the timeout for pip to handle slow connections
-RUN pip install --default-timeout=600 --no-cache-dir -r requirements.txt
-RUN python -m spacy download en_core_web_sm
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your entire project into the container
-COPY . /app/
+# Copy the whole project (this brings in api/, saved_models/, etc.)
+COPY . .
 
-# Expose the port Cloud Run expects
+# Set working directory to api (since you run uvicorn from there)
+WORKDIR /app/api
+
+# Expose FastAPI port
 EXPOSE 8080
 
-# Use the PORT env var (injected by Cloud Run)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run FastAPI (production mode)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
