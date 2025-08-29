@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Base URL for your API (mapped host port -> container port)
-BASE_URL="http://127.0.0.1:9090"
+BASE_URL="https://cybersecurity-api-service-44185828496.us-central1.run.app"
 
 echo "🚀 Starting AI Cybersecurity API Testing against $BASE_URL ..."
 echo "============================================================="
