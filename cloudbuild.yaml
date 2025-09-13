@@ -34,3 +34,6 @@ steps:
 # This tells Cloud Build what images to produce
 images:
   - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
