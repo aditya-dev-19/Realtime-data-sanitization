@@ -8,7 +8,7 @@ steps:
       - |
         # Use the token from Secret Manager to authenticate with GitHub
         git config --global credential.helper 'store --file=/tmp/git-credentials'
-        echo "https://x-access-token:$GITHUB_TOKEN@github.com" > /tmp/git-credentials
+        echo "https://x-access-token:$$GITHUB_TOKEN@github.com" > /tmp/git-credentials
         
         # Now install git-lfs and pull the large files
         apt-get update && apt-get install -y git-lfs
