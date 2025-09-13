@@ -64,6 +64,12 @@ def dynamic_analysis(data: DynamicData):
 @app.post("/analyze-network-traffic", tags=["Threat Analysis"])
 def network_analysis(data: NetworkData):
     """Analyzes a vector of network features for anomalies and known attack types."""
+    EXPECTED_FEATURES = 10 
+    if len(data.features) != EXPECTED_FEATURES:
+        raise HTTPException(
+            status_code=400, # Bad Request
+            detail=f"Invalid number of features. Expected {EXPECTED_FEATURES}, but got {len(data.features)}."
+        )
     try:
         return orchestrator.analyze_network_traffic(data.features)
     except Exception as e:
