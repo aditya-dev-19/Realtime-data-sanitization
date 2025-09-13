@@ -1,10 +1,16 @@
 steps:
-  # Step 1: Use a git image and run a script to install git-lfs and pull files
+  # STEP 1: Log in to Git and pull LFS files
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
+    secretEnv: ['GITHUB_TOKEN']
     args:
       - '-c'
       - |
+        # Use the token from Secret Manager to authenticate with GitHub
+        git config --global credential.helper 'store --file=/tmp/git-credentials'
+        echo "https://x-access-token:$$GITHUB_TOKEN@github.com" > /tmp/git-credentials
+        
+        # Now install git-lfs and pull the large files
         apt-get update && apt-get install -y git-lfs
         git lfs pull
 
@@ -31,9 +37,14 @@ steps:
       - 'managed'
       - '--allow-unauthenticated' # Keep if your API is public
 
-# This tells Cloud Build what images to produce
 images:
   - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
+# This block tells Cloud Build to fetch our secret
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/github-token/versions/latest
+    env: 'GITHUB_TOKEN'
