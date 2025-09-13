@@ -28,14 +28,15 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'cybersecurity-api-service'   # <-- IMPORTANT: Replace with your Cloud Run service name
+      - 'cybersecurity-api-service'
       - '--image'
       - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
       - '--region'
-      - 'us-central1'         # <-- IMPORTANT: Replace with your service region (e.g., us-central1)
+      - 'us-central1'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated' # Keep if your API is public
+      - '--allow-unauthenticated'
+
 
 images:
   - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
