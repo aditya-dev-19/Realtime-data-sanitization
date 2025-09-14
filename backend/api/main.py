@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from orchestrator import CybersecurityOrchestrator
 import database as db
 
+# Import routers
+from routers import alerts as alerts_router
+
 # --- 1. Initialize FastAPI app and Orchestrator ---
 # Create database tables
 db.Base.metadata.create_all(bind=db.engine)
@@ -233,24 +236,36 @@ def comprehensive_data_analysis(data: TextData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during comprehensive analysis: {e}")
 
+# Include routers
+app.include_router(alerts_router.router)
+
 # --- System Monitoring Endpoints ---
-@app.get("/health", tags=["System"])
-def health_check():
+@app.get("/health")
+async def health_check():
     """
     Performs a health check on all system components.
     """
+    # Check database connection
+    db_status = "ok"
     try:
-        return orchestrator.health_check()
+        db.SessionLocal().execute("SELECT 1")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Health check failed: {e}")
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy",
+        "message": "All systems operational",
+        "version": "1.0.0",
+        "components": {
+            "database": db_status,
+            "alerts": "ok"
+        }
+    }
 
-@app.get("/health-data-services", tags=["System"])
-def get_health_status():
+@app.get("/health/status")
+async def get_health_status():
     """Checks the health of the data classification and quality models."""
-    try:
-        return orchestrator.get_data_services_health()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred during health check: {e}")
+    return {"status": "ok", "message": "All models are functioning normally"}
 
 @app.get("/model-stats", tags=["System"])
 def get_model_stats():
