@@ -53,18 +53,22 @@ class SystemStatusProvider with ChangeNotifier {
 
   // Fetch system status from the API
   Future<void> fetchSystemStatus() async {
+    // Prevent multiple simultaneous requests
     if (_isLoading) return;
     
-    _isLoading = true;
-    _error = '';
-    notifyListeners();
-
     try {
+      _isLoading = true;
+      _error = '';
+      notifyListeners();
+
+      // Fetch system health from API
       _systemStatus = await _apiService.getSystemHealth();
       _lastUpdated = DateTime.now();
-    } catch (e) {
-      _error = 'Failed to fetch system status: ${e.toString()}';
+    } catch (e, stackTrace) {
       debugPrint('Error fetching system status: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      _error = 'Failed to fetch system status: ${e.toString()}';
       
       // Fallback to mock data if API fails
       _systemStatus = {
