@@ -1,151 +1,183 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'api_service.dart'; // Import your ApiService
+import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/material.dart' show CardThemeData;
 
-void main() {
-  runApp(const MyApp());
+// Providers
+import 'providers/threat_provider.dart';
+import 'providers/system_status_provider.dart';
+import 'providers/dashboard_provider.dart';
+import 'providers/alerts_provider.dart';
+
+// Screens
+import 'screens/dashboard_screen.dart';
+import 'screens/threat_detection_screen.dart';
+import 'screens/alerts_page.dart';
+import 'screens/settings_screen.dart';
+
+// Services
+import 'services/api_service.dart';
+
+// Initialize environment variables
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Error loading .env file: $e');
+  }
+  
+  runApp(
+    MultiProvider(
+      providers: [
+        // Core providers
+        ChangeNotifierProvider(create: (_) => SystemStatusProvider()),
+        ChangeNotifierProvider(create: (_) => DashboardProvider()),
+        ChangeNotifierProvider(create: (_) => AlertsProvider()),
+        ChangeNotifierProvider(create: (_) => ThreatProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Cybersecurity App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const MyHomePage(),
-    );
-  }
+  State<MyApp> createState() => _MyAppState();
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  final ApiService _apiService = ApiService();
-  final TextEditingController _textController = TextEditingController();
-  String _welcomeMessage = 'Loading...';
-  Map<String, dynamic>? _analysisResult;
+class _MyAppState extends State<MyApp> {
+  int _currentIndex = 0;
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
-    _loadWelcomeMessage();
+    
+    // Initialize screens
+    _screens = [
+      const DashboardScreen(),
+      const ThreatDetectionScreen(),
+      const AlertsScreen(),
+      const SettingsScreen(),
+    ];
+    
+    // Initial data loading
+    _loadInitialData();
+  }
+  
+  Future<void> _loadInitialData() async {
+    // Load initial data in parallel
+    await Future.wait([
+      context.read<SystemStatusProvider>().fetchSystemStatus(),
+      context.read<DashboardProvider>().fetchDashboardData(),
+      context.read<AlertsProvider>().fetchAlerts(),
+    ]);
   }
 
-  void _loadWelcomeMessage() async {
-    try {
-      final message = await _apiService.getRoot();
-      setState(() {
-        _welcomeMessage = message;
-      });
-    } catch (e) {
-      setState(() {
-        _welcomeMessage = 'Failed to load message';
-      });
-    }
-  }
-
-  void _analyzeText() async {
-    if (_textController.text.isEmpty) return;
-
-    try {
-      final result = await _apiService.analyzeText(_textController.text);
-      setState(() {
-        _analysisResult = result;
-      });
-    } catch (e) {
-      // Handle error, maybe show a snackbar
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-    }
+  // Build the bottom navigation bar
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      items: [
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.dashboard),
+          label: 'Dashboard',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.security),
+          label: 'Scan',
+        ),
+        BottomNavigationBarItem(
+          icon: Consumer<AlertsProvider>(
+            builder: (context, alertsProvider, _) {
+              final unreadCount = alertsProvider.unreadCount;
+              return Stack(
+                children: [
+                  const Icon(Icons.notifications),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          label: 'Alerts',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cybersecurity Analysis')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              _welcomeMessage,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _textController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Enter text to analyze',
-              ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _analyzeText,
-              child: const Text('Analyze Text'),
-            ),
-            const SizedBox(height: 20),
-            if (_analysisResult != null)
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Analysis Results:',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ..._analysisResult!.entries.map((entry) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '• ${entry.key.replaceAll('_', ' ').toUpperCase()}:' ,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (entry.value is Map)
-                                  ...(entry.value as Map).entries.map((subEntry) => Padding(
-                                        padding: const EdgeInsets.only(left: 16.0, top: 4.0),
-                                        child: Text(
-                                          '${subEntry.key}: ${subEntry.value}',
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ))
-                                else
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 16.0, top: 2.0),
-                                    child: Text(
-                                      entry.value.toString(),
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                const Divider(height: 16, thickness: 1),
-                              ],
-                            ),
-                          )).toList(),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+    return MaterialApp(
+      title: 'AI Cybersecurity',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A1A2F),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0A1A2F),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Color(0xFF0F2A48),
+          selectedItemColor: Colors.blue,
+          unselectedItemColor: Colors.grey,
+          type: BottomNavigationBarType.fixed,
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF1E2C42),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+      ),
+      home: Scaffold(
+        body: _screens[_currentIndex],
+        bottomNavigationBar: _buildBottomNavBar(),
       ),
     );
   }
