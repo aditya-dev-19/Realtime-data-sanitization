@@ -97,9 +97,50 @@ class _MyHomePageState extends State<MyHomePage> {
             if (_analysisResult != null)
               Expanded(
                 child: SingleChildScrollView(
-                  child: Text(
-                    JsonEncoder.withIndent('  ').convert(_analysisResult),
-                    style: const TextStyle(fontFamily: 'monospace'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Analysis Results:',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ..._analysisResult!.entries.map((entry) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '• ${entry.key.replaceAll('_', ' ').toUpperCase()}:' ,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (entry.value is Map)
+                                  ...(entry.value as Map).entries.map((subEntry) => Padding(
+                                        padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+                                        child: Text(
+                                          '${subEntry.key}: ${subEntry.value}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ))
+                                else
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 16.0, top: 2.0),
+                                    child: Text(
+                                      entry.value.toString(),
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                const Divider(height: 16, thickness: 1),
+                              ],
+                            ),
+                          )).toList(),
+                    ],
                   ),
                 ),
               ),
