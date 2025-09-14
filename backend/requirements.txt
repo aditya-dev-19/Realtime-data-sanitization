@@ -32,3 +32,9 @@ spacy
 requests
 
 python-multipart
+
+# For generating test data
+Faker
+
+# For JWT authentication (future use)
+python-jose[cryptography]
