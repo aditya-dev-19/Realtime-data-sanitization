@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'api_service.dart'; // Import your ApiService
 
@@ -12,9 +13,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Cybersecurity App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: const MyHomePage(),
     );
   }
@@ -62,18 +61,16 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     } catch (e) {
       // Handle error, maybe show a snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cybersecurity Analysis'),
-      ),
+      appBar: AppBar(title: const Text('Cybersecurity Analysis')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -101,7 +98,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Expanded(
                 child: SingleChildScrollView(
                   child: Text(
-                    const JsonEncoder.withIndent('  ').convert(_analysisResult),
+                    JsonEncoder.withIndent('  ').convert(_analysisResult),
                     style: const TextStyle(fontFamily: 'monospace'),
                   ),
                 ),
