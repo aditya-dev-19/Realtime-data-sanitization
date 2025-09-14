@@ -71,12 +71,15 @@ class _MyAppState extends State<MyApp> {
   }
   
   Future<void> _loadInitialData() async {
-    // Load initial data in parallel
-    await Future.wait([
-      context.read<SystemStatusProvider>().fetchSystemStatus(),
-      context.read<DashboardProvider>().fetchDashboardData(),
-      context.read<AlertsProvider>().fetchAlerts(),
-    ]);
+    // Schedule the data loading to happen after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Load initial data in parallel
+      await Future.wait([
+        context.read<SystemStatusProvider>().fetchSystemStatus(),
+        context.read<DashboardProvider>().fetchDashboardData(),
+        context.read<AlertsProvider>().fetchAlerts(),
+      ]);
+    });
   }
 
   // Build the bottom navigation bar

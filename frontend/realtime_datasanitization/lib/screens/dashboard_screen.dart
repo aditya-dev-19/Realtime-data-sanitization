@@ -115,14 +115,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _getSystemStatusMessage(String status) {
     switch (status.toLowerCase()) {
       case 'healthy':
+      case 'ok':
         return 'All systems operational';
       case 'degraded':
         return 'Some systems may be experiencing issues';
       case 'critical':
+      case 'error':
         return 'Critical system issues detected';
       default:
         return 'Unknown system status';
     }
+  }
+
+  List<Widget> _buildComponentStatus(Map<String, dynamic> components) {
+    final List<Widget> statusWidgets = [];
+    
+    components.forEach((key, value) {
+      final status = value.toString().toLowerCase();
+      Color statusColor;
+      IconData statusIcon;
+      
+      if (status == 'ok' || status == 'true' || status == 'enabled') {
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+      } else if (status == 'degraded' || status == 'warning') {
+        statusColor = Colors.orange;
+        statusIcon = Icons.warning_amber_rounded;
+      } else if (status == 'error' || status == 'false' || status == 'disabled') {
+        statusColor = Colors.red;
+        statusIcon = Icons.error_outline;
+      } else {
+        statusColor = Colors.grey;
+        statusIcon = Icons.help_outline;
+      }
+      
+      // Format the key for display (convert snake_case to Title Case)
+      final displayKey = key.split('_')
+          .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+          .join(' ');
+      
+      statusWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                displayKey,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                value.toString().toUpperCase(),
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+    
+    return statusWidgets;
   }
 
   @override
@@ -185,66 +246,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AnalyzeTextScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            "Analyze Text",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ScanScreen(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            "Scan",
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-
                 // System Status Card
                 Card(
                   color: const Color(0xFF1E2C42),
@@ -271,48 +272,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               systemStatusProvider.systemStatus?['status'] ?? 'unknown',
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              _getSystemStatusMessage(
-                                systemStatusProvider.systemStatus?['status'] ?? 'unknown',
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
+                            Expanded(
+                              child: Text(
+                                systemStatusProvider.systemStatus?['details'] ?? 'Checking system status...',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        if (systemStatusProvider.systemStatus?['details'] != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            systemStatusProvider.systemStatus!['details'],
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
-                            ),
+                        const SizedBox(height: 16),
+                        // Component Status
+                        const Text(
+                          'Component Status',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 8),
+                        ..._buildComponentStatus(systemStatusProvider.systemStatus?['components'] ?? {}),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Stats Grid
+                // System Metrics Grid
                 Row(
                   children: [
                     _buildStatCard(
-                      'Total Scans',
-                      '${dashboardProvider.dashboardData?['totalScans'] ?? '0'}',
-                      Icons.assignment_outlined,
-                      Colors.blue,
+                      'Data Classification',
+                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      Icons.security,
+                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toLowerCase() == 'enhanced' 
+                          ? Colors.green 
+                          : Colors.orange,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Threats Detected',
-                      '${dashboardProvider.dashboardData?['threatsDetected'] ?? '0'}',
-                      Icons.warning_amber_rounded,
-                      Colors.red,
+                      'Enhanced Features',
+                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true ? 'ENABLED' : 'DISABLED',
+                      Icons.auto_awesome,
+                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true 
+                          ? Colors.purple 
+                          : Colors.grey,
                     ),
                   ],
                 ),
@@ -320,17 +327,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     _buildStatCard(
-                      'Files Scanned',
-                      '${dashboardProvider.dashboardData?['filesScanned'] ?? '0'}',
-                      Icons.insert_drive_file_outlined,
-                      Colors.green,
+                      'Orchestrator',
+                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      Icons.sync,
+                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toLowerCase() == 'ok' 
+                          ? Colors.blue 
+                          : Colors.red,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Avg. Scan Time',
-                      '${dashboardProvider.dashboardData?['avgScanTime'] ?? '0'}s',
-                      Icons.timer_outlined,
-                      Colors.orange,
+                      'Network Traffic',
+                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      Icons.network_check,
+                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toLowerCase() == 'ok' 
+                          ? Colors.teal 
+                          : Colors.orange,
                     ),
                   ],
                 ),
@@ -386,7 +397,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: _getSeverityColor(alert.severity).withOpacity(0.5),
+          color: _getSeverityColor(alert.severity.toString().split('.').last).withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -397,12 +408,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _getSeverityColor(alert.severity).withOpacity(0.2),
+                color: _getSeverityColor(alert.severity.toString().split('.').last).withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _getSeverityIcon(alert.severity),
-                color: _getSeverityColor(alert.severity),
+                _getSeverityIcon(alert.severity.toString().split('.').last),
+                color: _getSeverityColor(alert.severity.toString().split('.').last),
                 size: 20,
               ),
             ),
@@ -420,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    alert.message,
+                    alert.description ?? 'No description',
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 14,
@@ -430,7 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _formatTimeAgo(alert.timestamp),
+                    _formatTimeAgo(alert.createdAt),
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 12,
@@ -455,25 +466,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
-    if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()}mo ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
+    if (difference.inMinutes < 1) {
       return 'Just now';
+    } else if (difference.inHours < 1) {
+      final minutes = difference.inMinutes;
+      return '$minutes ${minutes == 1 ? 'minute' : 'minutes'} ago';
+    } else if (difference.inDays < 1) {
+      final hours = difference.inHours;
+      return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
+    } else if (difference.inDays < 7) {
+      final days = difference.inDays;
+      return '$days ${days == 1 ? 'day' : 'days'} ago';
+    } else {
+      return DateFormat('MMM d, y').format(dateTime);
     }
   }
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
-      case 'high':
+      case 'critical':
         return Colors.red;
-      case 'medium':
+      case 'high':
         return Colors.orange;
+      case 'medium':
+        return Colors.yellow;
       case 'low':
       default:
         return Colors.blue;
@@ -482,10 +498,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   IconData _getSeverityIcon(String severity) {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return Icons.error;
       case 'high':
         return Icons.warning_amber_rounded;
       case 'medium':
-        return Icons.info_outline;
+        return Icons.warning_amber_outlined;
       case 'low':
       default:
         return Icons.info_outline;
