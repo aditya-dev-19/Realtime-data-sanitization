@@ -1,41 +1,26 @@
-# --- Python Virtual Environments ---
-# These should always be ignored
-venv/
-.venv/
-env/
+# Git files
+.git
+.gitignore
+.gitattributes
 
-# --- Secrets ---
-# Never commit environment variables or secret keys
-.env
-*.env.*
+# Docker files
+Dockerfile
+.dockerignore
 
-# --- Python Cache & Build Artifacts ---
-# These are auto-generated
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-build/
-dist/
-*.egg-info/
 
-# --- IDE & Editor Folders ---
-# Visual Studio Code
-.vscode/
-# PyCharm
-.idea/
+# Local development files
+.env
+venv/
+*.db
 
-# --- Temporary Files ---
-# Directory for temporary file uploads from the API
-tmp/
+# Model directories - IMPORTANT
+saved_models/
+downloaded_models/
 
-# --- Testing ---
-.pytest_cache/
-.coverage
-htmlcov/
-
-# --- OS-specific files ---
-# macOS
-.DS_Store
-# Windows
-Thumbs.db
+# Other environment files
+*.ipynb_checkpoints
