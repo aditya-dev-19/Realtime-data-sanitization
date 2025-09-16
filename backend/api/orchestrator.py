@@ -12,22 +12,48 @@ from datetime import datetime
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+try:
+    from tensorflow.keras.models import load_model
+    from tensorflow.keras.preprocessing.sequence import pad_sequences
+except ImportError:
+    # Fallback if TensorFlow is not available
+    load_model = None
+    pad_sequences = None
+    print("Warning: TensorFlow not available. Some features may be limited.")
+
 import numpy as np
 import joblib
 
-# Import transformer models
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
+try:
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+except ImportError:
+    torch = None
+    AutoModelForSequenceClassification = None
+    AutoTokenizer = None
+    print("Warning: Transformers not available. Some features may be limited.")
+
+# Import local modules
+try:
+    from .models.data_classification.sensitive_classifier import SensitiveDataClassifier, EnhancedSensitiveClassifier
+    from .models.data_classification.quality_assessor import DataQualityAssessor, EnhancedDataQualityAssessor
+    from .models.data_classification.api_interface import DataClassificationAPI
+    from .models.data_classification.config import ClassifierConfig, QualityConfig
+except ImportError as e:
+    print(f"Warning: Could not import data classification modules: {e}")
+    SensitiveDataClassifier = None
+    EnhancedSensitiveClassifier = None
+    DataQualityAssessor = None
+    EnhancedDataQualityAssessor = None
+    DataClassificationAPI = None
+    ClassifierConfig = None
+    QualityConfig = None
 
 # Import your custom model classes to resolve the unpickling error
-from models.data_classification.sensitive_classifier import SensitiveDataClassifier
-from models.data_classification.quality_assessor import DataQualityAssessor
-# Import new enhanced models and API interface
-from models.data_classification.enhanced_models import EnhancedSensitiveClassifier, DataQualityAssessor as EnhancedDataQualityAssessor
-from models.data_classification.api_interface import DataClassificationAPI
-from models.data_classification.config import ClassifierConfig, QualityConfig
+# Using absolute imports to avoid circular dependencies
+# These are already imported above with relative imports
+    class ClassifierConfig: pass
+    class QualityConfig: pass
 
 class CybersecurityOrchestrator:
     def __init__(self, model_dir='../saved_models/'):
@@ -103,16 +129,23 @@ class CybersecurityOrchestrator:
             self.data_classification_api = DataClassificationAPI()
             
             # Keep backward compatibility with original models
-            from models.data_classification.sensitive_classifier import SensitiveDataClassifier
-            from models.data_classification.quality_assessor import DataQualityAssessor
-            
-            # Initialize enhanced models
-            self.enhanced_sensitive_classifier = EnhancedSensitiveClassifier()
-            self.enhanced_quality_assessor = EnhancedDataQualityAssessor()
-            
-            # Keep original models for fallback
-            self.sensitive_classifier = SensitiveDataClassifier()
-            self.quality_assessor = DataQualityAssessor()
+            try:
+                from api.models.data_classification.sensitive_classifier import SensitiveDataClassifier
+                from api.models.data_classification.quality_assessor import DataQualityAssessor
+                
+                # Initialize enhanced models
+                self.enhanced_sensitive_classifier = EnhancedSensitiveClassifier()
+                self.enhanced_quality_assessor = EnhancedDataQualityAssessor()
+                
+                # Keep original models for fallback
+                self.sensitive_classifier = SensitiveDataClassifier()
+                self.quality_assessor = DataQualityAssessor()
+            except ImportError as e:
+                print(f"Warning: Could not initialize data classification models: {e}")
+                self.enhanced_sensitive_classifier = None
+                self.enhanced_quality_assessor = None
+                self.sensitive_classifier = None
+                self.quality_assessor = None
             
             self.sensitive_metadata = {
                 "note": "Using enhanced model instances with API interface",
@@ -127,11 +160,17 @@ class CybersecurityOrchestrator:
             print("   Falling back to basic models...")
             
             # Fallback to basic models
-            from models.data_classification.sensitive_classifier import SensitiveDataClassifier
-            from models.data_classification.quality_assessor import DataQualityAssessor
-            
-            self.sensitive_classifier = SensitiveDataClassifier()
-            self.quality_assessor = DataQualityAssessor()
+            try:
+                from api.models.data_classification.sensitive_classifier import SensitiveDataClassifier
+                from api.models.data_classification.quality_assessor import DataQualityAssessor
+                
+                self.sensitive_classifier = SensitiveDataClassifier()
+                self.quality_assessor = DataQualityAssessor()
+            except ImportError as e:
+                print(f"Warning: Could not initialize fallback models: {e}")
+                self.sensitive_classifier = None
+                self.quality_assessor = None
+                
             self.data_classification_api = None
             self.enhanced_sensitive_classifier = None
             self.enhanced_quality_assessor = None
