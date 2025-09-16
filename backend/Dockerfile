@@ -18,4 +18,4 @@ COPY ./models /app/models
 EXPOSE 8080
 
 # [MODIFIED] Run main.py using the $PORT environment variable
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
