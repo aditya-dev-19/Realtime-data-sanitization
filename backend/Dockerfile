@@ -21,4 +21,4 @@ EXPOSE 8080
 WORKDIR /app/api
 
 # [MODIFIED] Run main.py using the $PORT environment variable
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
