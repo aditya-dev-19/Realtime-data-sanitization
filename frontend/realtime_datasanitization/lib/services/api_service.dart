@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../models/alert.dart';
 
 class ApiService {
-  // Base URL for the API
-  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/';  // Update this with your actual backend URL
+  // Base URL for the API with version prefix
+  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/api/v1';
   
   // Headers for API requests
   final Map<String, String> _headers = {
@@ -33,21 +33,27 @@ class ApiService {
   // Auth
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
+      final url = '$_baseUrl/users/token';
+      debugPrint('Attempting login to: $url');
+      
       final response = await http.post(
-        Uri.parse('$_baseUrl/users/token'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: 'username=${Uri.encodeComponent(username)}&password=${Uri.encodeComponent(password)}',
       );
 
+      debugPrint('Login response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(utf8.decode(response.bodyBytes));
         if (responseData is! Map<String, dynamic>) {
-          throw Exception('Invalid response format from server');
+          throw Exception('Invalid response format from server. Response: ${response.body}');
         }
         if (responseData['access_token'] == null) {
-          throw Exception('No access token in response');
+          throw Exception('No access token in response. Response: ${response.body}');
         }
         return responseData;
       } else {
@@ -61,32 +67,35 @@ class ApiService {
   }
 
   Future<void> register(String username, String email, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/users/'),
-        headers: _headers,
-        body: jsonEncode({
-          'username': username,
-          'email': email,
-          'password': password,
-        }),
-      );
+  try {
+    // Try without the /api/v1 prefix since it's not working
+    final url = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/register';
+    debugPrint('Attempting registration at: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'username': username,
+        'email': email,
+        'password': password,
+      }),
+    );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return; // Success
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(
-          error['detail'] ?? 
-          error['message'] ?? 
-          'Failed to register: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      debugPrint('Error in register: $e');
-      rethrow;
+    debugPrint('Register response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to register: ${response.statusCode} - ${response.body}');
     }
+  } catch (e) {
+    debugPrint('Error in register: $e');
+    rethrow;
   }
+}
 
 
   // Alerts
