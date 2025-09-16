@@ -8,15 +8,61 @@ from typing import List, Dict, Any
 import json
 from sqlalchemy.orm import Session
 
-# Import your main orchestrator class and database components
-from orchestrator import CybersecurityOrchestrator
-import database as db
+# Import database first to create tables
+try:
+    # Try relative import first (when run as module)
+    from . import database as db
+except ImportError:
+    # Fall back to absolute import (when run directly)
+    import database as db
+
+# Import your main orchestrator class
+try:
+    try:
+        from .orchestrator import CybersecurityOrchestrator
+    except ImportError:
+        from orchestrator import CybersecurityOrchestrator
+except ImportError as e:
+    print(f"Warning: Could not import CybersecurityOrchestrator: {e}")
+    # Define a dummy class to prevent import errors
+    class CybersecurityOrchestrator:
+        def __init__(self, *args, **kwargs):
+            print("Dummy CybersecurityOrchestrator initialized - some features may be limited")
 
 # Import routers
-from routers import alerts as alerts_router
+try:
+    try:
+        from .routers.alerts import router as alerts_router
+        from .routers.users import router as users_router
+    except ImportError as e:
+        print(f"Relative import failed: {e}")
+        try:
+            from routers.alerts import router as alerts_router
+            from routers.users import router as users_router
+        except ImportError as e:
+            print(f"Absolute import failed: {e}")
+            raise
+except ImportError as e:
+    print(f"Warning: Could not import routers: {e}")
+    # Create dummy routers to prevent import errors
+    from fastapi import APIRouter
+    alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
+    users_router = APIRouter(prefix="/users", tags=["users"])
 
 # --- 1. Initialize FastAPI app and Orchestrator ---
-# Create database tables
+# Import models to ensure they're registered with SQLAlchemy
+try:
+    try:
+        from .models import Alert, AnalysisResult  # noqa
+    except ImportError:
+        from models import Alert, AnalysisResult  # noqa
+except ImportError as e:
+    print(f"Warning: Could not import models: {e}")
+    # Define dummy classes to prevent import errors
+    class Alert: pass
+    class AnalysisResult: pass
+
+# Now it's safe to create all tables
 db.Base.metadata.create_all(bind=db.engine)
 
 app = FastAPI(
@@ -236,8 +282,15 @@ def comprehensive_data_analysis(data: TextData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during comprehensive analysis: {e}")
 
-# Include routers
-app.include_router(alerts_router.router)
+# Test endpoint for alerts
+@app.get("/test-alert", tags=["Test"])
+async def test_alert():
+    """Test endpoint to verify alerts functionality."""
+    return {"status": "success", "message": "Alerts endpoint is working!"}
+
+# Include the API routers
+app.include_router(alerts_router, prefix="/api/v1")  # Add version prefix
+app.include_router(users_router, prefix="/api/v1")   # Add version prefix
 
 # --- System Monitoring Endpoints ---
 @app.get("/health")

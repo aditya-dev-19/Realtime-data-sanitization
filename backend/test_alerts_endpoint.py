@@ -12,7 +12,18 @@ from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configuration
-BASE_URL = "http://localhost:8000"  # Update this if your API is running elsewhere
+import os
+BASE_URL = "http://localhost:8081"  # Update this if your API is running elsewhere
+
+# Enable debug logging for requests
+import http.client as http_client
+import logging
+http_client.HTTPConnection.debuglevel = 1
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 def print_success(message):
     print(f"✅ {message}")
@@ -41,13 +52,30 @@ def test_create_test_alerts():
     """Test creating test alerts."""
     print("\n=== Testing Create Test Alerts ===")
     try:
-        response = requests.post(f"{BASE_URL}/alerts/test/generate")
+        # First test the test endpoint
+        response = requests.get(f"{BASE_URL}/test-alert")
         response.raise_for_status()
-        data = response.json()
-        print_success(f"Created {data.get('count', 0)} test alerts")
+        print_success(f"Test endpoint response: {response.json()}")
+        
+        # Now test creating an alert through the API
+        alert_data = {
+            "title": "Test Alert",
+            "description": "This is a test alert",
+            "severity": "MEDIUM",
+            "alert_type": "SYSTEM_ALERT",
+            "source": "test-script"
+        }
+        response = requests.post(
+            f"{BASE_URL}/api/v1/alerts/",
+            json=alert_data
+        )
+        response.raise_for_status()
+        print_success(f"Successfully created test alert: {response.json()}")
         return True
     except Exception as e:
-        print_error(f"Failed to create test alerts: {e}")
+        print_error(f"Failed to create test alert: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print_error(f"Response content: {e.response.text}")
         return False
 
 def test_get_alerts():

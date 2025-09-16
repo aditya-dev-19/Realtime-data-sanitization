@@ -7,7 +7,7 @@ import '../models/alert.dart';
 
 class ApiService {
   // Base URL for the API
-  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app';
+  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/';  // Update this with your actual backend URL
   
   // Headers for API requests
   final Map<String, String> _headers = {
@@ -29,6 +29,65 @@ class ApiService {
     _authToken = null;
     _headers.remove('Authorization');
   }
+
+  // Auth
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/users/token'),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'username=${Uri.encodeComponent(username)}&password=${Uri.encodeComponent(password)}',
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        if (responseData is! Map<String, dynamic>) {
+          throw Exception('Invalid response format from server');
+        }
+        if (responseData['access_token'] == null) {
+          throw Exception('No access token in response');
+        }
+        return responseData;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to login: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error in login: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> register(String username, String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/users/'),
+        headers: _headers,
+        body: jsonEncode({
+          'username': username,
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return; // Success
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(
+          error['detail'] ?? 
+          error['message'] ?? 
+          'Failed to register: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error in register: $e');
+      rethrow;
+    }
+  }
+
 
   // Alerts
   Future<List<dynamic>> getAlerts({int limit = 100, String? status, String? severity, int offset = 0}) async {

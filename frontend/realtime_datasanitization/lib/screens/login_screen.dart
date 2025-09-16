@@ -1,13 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController();
+  State<LoginScreen> createState() => _LoginScreenState();
+}
 
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String _error = '';
+
+  Future<void> _login() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+
+      try {
+        final success = await context.read<AuthProvider>().login(
+              _emailController.text.trim(),
+              _passwordController.text,
+            );
+
+        if (!mounted) return;
+        
+        if (success) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          setState(() {
+            _error = 'Invalid email or password';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -38,8 +91,10 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 30),
 
               // 📧 Email
-              TextField(
-                controller: emailController,
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) => value!.isEmpty ? 'Please enter your email' : null,
                 decoration: InputDecoration(
                   hintText: "Email",
                   hintStyle: const TextStyle(color: Colors.grey),
@@ -53,10 +108,12 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
+              const SizedBox(height: 16),
               // 🔑 Password
-              TextField(
-                controller: passwordController,
+              TextFormField(
+                controller: _passwordController,
                 obscureText: true,
+                validator: (value) => value!.length < 6 ? 'Password must be at least 6 characters' : null,
                 decoration: InputDecoration(
                   hintText: "Password",
                   hintStyle: const TextStyle(color: Colors.grey),
@@ -70,6 +127,15 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
+              if (_error.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+              ],
               // ✅ Login Button
               SizedBox(
                 width: double.infinity,
@@ -80,23 +146,24 @@ class LoginScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
-                    if (emailController.text.isNotEmpty &&
-                        passwordController.text.isNotEmpty) {
-                      // ✅ Navigate to Home after login
-                      Navigator.pushReplacementNamed(context, "/home");
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Please enter email and password")),
-                      );
-                    }
-                  },
-                  child: const Text("Login",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                  onPressed: _isLoading ? null : _login,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "Login",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -109,7 +176,7 @@ class LoginScreen extends StatelessWidget {
                       style: TextStyle(color: Colors.grey)),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, "/signup"); // 👈 goes to SignUp
+                      Navigator.pushNamed(context, "/register");
                     },
                     child: const Text(
                       "Sign Up",
