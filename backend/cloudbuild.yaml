@@ -16,8 +16,9 @@ steps:
 
   # Step 2: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'backend'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA', '-f', 'backend/Dockerfile', '.']
+    dir: 'backend'  # This correctly sets the working directory
+    # [MODIFIED] Changed '-f backend/Dockerfile' to just '.'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA', '.']
 
   # Step 3: Push the image
   - name: 'gcr.io/cloud-builders/docker'
