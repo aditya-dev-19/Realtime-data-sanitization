@@ -1,45 +1,53 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from typing import List
+# In backend/api/routers/users.py
+from fastapi import APIRouter, HTTPException, status
+from .. import schemas, auth
+from ..firebase_admin import db # 👈 Import the Firestore client
 
-from database import get_db
-from models.user import User as UserModel
-from api.models.user import User as UserSchema, UserCreate
-from api.auth import get_password_hash, verify_password, create_access_token
-from api.models.user import Token
+router = APIRouter()
 
-router = APIRouter(
-    prefix="/users",
-    tags=["users"],
-    responses={404: {"description": "Not found"}},
-)
+@router.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate):
+    # Check if user already exists
+    user_ref = db.collection('users').document(user.email)
+    if user_ref.get().exists:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-def get_user(db: Session, username: str):
-    return db.query(UserModel).filter(UserModel.username == username).first()
+    # Hash the password
+    hashed_password = auth.get_password_hash(user.password)
 
-@router.post("/", response_model=UserSchema)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = get_user(db, username=user.username)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    hashed_password = get_password_hash(user.password)
-    db_user = UserModel(username=user.username, email=user.email, hashed_password=hashed_password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    # Create user data
+    user_data = {
+        "email": user.email,
+        "hashed_password": hashed_password
+    }
+    
+    # Save user to Firestore
+    user_ref.set(user_data)
+    
+    return {"email": user.email}
 
-@router.post("/token", response_model=Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = get_user(db, username=form_data.username)
-    if not user or not verify_password(form_data.password, user.hashed_password):
+
+@router.post("/token", response_model=schemas.Token)
+def login_for_access_token(user_credentials: schemas.TokenRequest):
+    # Get user from Firestore
+    user_ref = db.collection('users').document(user_credentials.email)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Incorrect email or password",
         )
-    access_token = create_access_token(
-        data={"sub": user.username}
-    )
+
+    user_data = user_doc.to_dict()
+
+    # Verify password
+    if not auth.verify_password(user_credentials.password, user_data['hashed_password']):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+        )
+    
+    # Create access token
+    access_token = auth.create_access_token(data={"sub": user_credentials.email})
     return {"access_token": access_token, "token_type": "bearer"}
