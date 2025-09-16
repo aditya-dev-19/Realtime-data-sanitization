@@ -1,143 +1,71 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime, timedelta
-import json
+from fastapi import APIRouter, HTTPException, Body
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field
+from datetime import datetime
 
+# [CORRECTED] Use a relative import to go up one level from 'routers' to 'api'
 try:
-    from ..database import get_db
-    from ..models import Alert, AlertSeverity, AlertStatus, AlertType
-except ImportError:
-    from database import get_db
-    from models import Alert, AlertSeverity, AlertStatus, AlertType
+    from ..firebase_admin import db 
+except (ImportError, ValueError):
+    # This fallback can be helpful for direct script testing, but the relative one is key
+    from api.firebase_admin import db
 
-router = APIRouter(
-    prefix="/alerts",
-    tags=["alerts"],
-    responses={404: {"description": "Not found"}},
-)
+# --- Pydantic Models for Alerts ---
+class AlertCreate(BaseModel):
+    """Model for creating a new alert."""
+    title: str = Field(..., example="Suspicious Network Activity")
+    description: str = Field(..., example="High volume of outbound traffic detected from internal IP.")
+    severity: str = Field(..., example="High", description="Can be 'Low', 'Medium', 'High', 'Critical'")
+    source: str = Field(..., example="Network Intrusion Detector")
+    details: Dict[str, Any] = Field({}, example={"ip_address": "192.168.1.100", "packets": 5000})
 
-def create_alert(
-    db: Session,
-    title: str,
-    alert_type: AlertType,
-    severity: AlertSeverity = AlertSeverity.MEDIUM,
-    description: str = None,
-    source: str = None,
-    metadata: dict = None,
-):
-    """Helper function to create a new alert."""
-    alert = Alert(
-        title=title,
-        description=description,
-        severity=severity,
-        alert_type=alert_type,
-        source=source or "system",
-        metadata=json.dumps(metadata) if metadata else None,
-    )
-    db.add(alert)
-    db.commit()
-    db.refresh(alert)
-    return alert
+class Alert(AlertCreate):
+    """Model for representing an alert retrieved from the database."""
+    id: str
+    timestamp: datetime
+    is_read: bool = False
 
-@router.get("/", response_model=List[dict])
-def get_alerts(
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
-    status: Optional[AlertStatus] = None,
-    severity: Optional[AlertSeverity] = None,
-    alert_type: Optional[AlertType] = None,
-    days: Optional[int] = 7,
-):
-    """
-    Retrieve a list of alerts with optional filtering.
-    """
-    query = db.query(Alert)
-    
-    # Apply filters
-    if status:
-        query = query.filter(Alert.status == status)
-    if severity:
-        query = query.filter(Alert.severity == severity)
-    if alert_type:
-        query = query.filter(Alert.alert_type == alert_type)
-    if days:
-        time_threshold = datetime.utcnow() - timedelta(days=days)
-        query = query.filter(Alert.created_at >= time_threshold)
-    
-    # Order by most recent first
-    alerts = query.order_by(Alert.created_at.desc()).offset(skip).limit(limit).all()
-    return [alert.to_dict() for alert in alerts]
+# --- API Router ---
+router = APIRouter()
 
-@router.get("/{alert_id}", response_model=dict)
-def get_alert(alert_id: int, db: Session = Depends(get_db)):
-    """
-    Retrieve a specific alert by ID.
-    """
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return alert.to_dict()
+@router.post("/alerts/", response_model=Alert, status_code=201)
+async def create_alert(alert_data: AlertCreate):
+    """Creates a new alert and stores it in Firestore."""
+    try:
+        new_alert_ref = db.collection('alerts').document()
+        alert_to_save = alert_data.dict()
+        alert_to_save['timestamp'] = datetime.now()
+        alert_to_save['is_read'] = False
+        new_alert_ref.set(alert_to_save)
+        response_data = alert_to_save.copy()
+        response_data['id'] = new_alert_ref.id
+        return response_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create alert in Firestore: {str(e)}")
 
-@router.put("/{alert_id}/status")
-def update_alert_status(
-    alert_id: int, 
-    status: AlertStatus,
-    db: Session = Depends(get_db)
-):
-    """
-    Update the status of an alert.
-    """
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    
-    alert.status = status
-    if status == AlertStatus.RESOLVED:
-        alert.resolved_at = datetime.utcnow()
-    
-    db.commit()
-    return {"message": f"Alert {alert_id} status updated to {status}"}
+@router.get("/alerts/", response_model=List[Alert])
+async def get_alerts(limit: int = 100):
+    """Retrieves a list of the latest alerts from Firestore."""
+    try:
+        alerts_ref = db.collection('alerts').order_by('timestamp', direction='DESCENDING').limit(limit)
+        alerts = []
+        for doc in alerts_ref.stream():
+            alert_data = doc.to_dict()
+            alert_data['id'] = doc.id
+            alerts.append(alert_data)
+        return alerts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve alerts from Firestore: {str(e)}")
 
-@router.post("/test/generate")
-def generate_test_alerts(db: Session = Depends(get_db)):
-    """
-    Generate test alerts (for development only).
-    """
-    from faker import Faker
-    import random
-    
-    fake = Faker()
-    
-    alert_types = list(AlertType)
-    severities = list(AlertSeverity)
-    statuses = list(AlertStatus)
-    
-    for _ in range(10):
-        alert_type = random.choice(alert_types)
-        severity = random.choice(severities)
-        status = random.choice(statuses)
-        
-        # Create alert with realistic data based on type
-        if alert_type == AlertType.THREAT_DETECTED:
-            title = f"Potential {fake.word().capitalize()} Threat Detected"
-            description = fake.sentence()
-        elif alert_type == AlertType.SYSTEM_ISSUE:
-            title = f"System {fake.word().capitalize()} Issue Detected"
-            description = f"{fake.sentence()} Error code: {fake.uuid4()[:8]}"
-        else:
-            title = fake.sentence(nb_words=6)
-            description = fake.paragraph()
-        
-        create_alert(
-            db=db,
-            title=title,
-            description=description,
-            alert_type=alert_type,
-            severity=severity,
-            source=fake.word(),
-            metadata={"test_data": True, "priority": random.randint(1, 5)},
-        )
-    
-    return {"message": "Generated 10 test alerts"}
+@router.put("/alerts/{alert_id}/read", status_code=204)
+async def mark_alert_as_read(alert_id: str):
+    """Marks a specific alert as read in Firestore."""
+    try:
+        alert_ref = db.collection('alerts').document(alert_id)
+        doc = alert_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        alert_ref.update({'is_read': True})
+        return
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update alert status in Firestore: {str(e)}")
