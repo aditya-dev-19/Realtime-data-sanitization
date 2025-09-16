@@ -8,21 +8,10 @@ from sqlalchemy.orm import Session
 from google.cloud import storage
 
 # --- Local Imports ---
-# It's good practice to handle potential import errors gracefully.
-try:
-    from . import database as db
-    from .orchestrator import CybersecurityOrchestrator
-    from .routers import users, alerts
-    from .models.user import User as UserModel
-    from .auth import get_password_hash
-except ImportError:
-    # This fallback is useful for local testing if the module structure changes.
-    import database as db
-    from orchestrator import CybersecurityOrchestrator
-    from routers import users, alerts
-    from models.user import User as UserModel
-    from auth import get_password_hash
-
+# No longer imports 'database' or SQLAlchemy models that were deleted.
+from .orchestrator import CybersecurityOrchestrator
+from .routers import users, alerts
+from .firebase_admin import db # Using Firestore for all database operations
 
 # --- Global Orchestrator ---
 # This will hold the loaded models so they are accessible to your endpoints.
