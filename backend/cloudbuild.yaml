@@ -24,10 +24,10 @@ steps:
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
-    # [MODIFIED] Add a longer startup timeout
-    - '--startup-cpu-boost'
-    - '--timeout=15m' # Increase overall request timeout if needed
-    - '--cpu-boost'
+    # [CORRECTED] Use valid flags for resources and timeout
+    - '--memory=2Gi'                # Allocate more memory for loading models
+    - '--timeout=900'               # Increase timeout to 15 minutes (900 seconds)
+    - '--cpu-boost'                 # Enable CPU boost for faster startup
     # Important: Ensure your Cloud Run service has permissions to access the GCS bucket.
     # This is typically done by assigning the 'Storage Object Viewer' role
     # to the service account used by Cloud Run.
