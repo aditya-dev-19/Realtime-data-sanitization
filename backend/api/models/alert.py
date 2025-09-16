@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Text, func
-from database import Base
 import enum
 from datetime import datetime
+from api.database import Base  # Import Base from the central database file
 
 class AlertSeverity(str, enum.Enum):    
     LOW = "low"
@@ -32,7 +32,7 @@ class Alert(Base):
     status = Column(Enum(AlertStatus), nullable=False, default=AlertStatus.OPEN)
     alert_type = Column(Enum(AlertType), nullable=False)
     source = Column(String(100), nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON string for additional data
+    alert_metadata = Column('metadata', Text, nullable=True)  # JSON string for additional data (renamed to avoid conflict with SQLAlchemy)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     resolved_at = Column(DateTime, nullable=True)
@@ -46,7 +46,7 @@ class Alert(Base):
             "status": self.status.value,
             "type": self.alert_type.value,
             "source": self.source,
-            "metadata": self.metadata,
+            "metadata": self.alert_metadata,  # Updated to use the new attribute name
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None

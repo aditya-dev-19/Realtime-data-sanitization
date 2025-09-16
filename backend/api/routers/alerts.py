@@ -4,8 +4,12 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import json
 
-from database import get_db
-from models.alert import Alert, AlertSeverity, AlertStatus, AlertType
+try:
+    from ..database import get_db
+    from ..models import Alert, AlertSeverity, AlertStatus, AlertType
+except ImportError:
+    from database import get_db
+    from models import Alert, AlertSeverity, AlertStatus, AlertType
 
 router = APIRouter(
     prefix="/alerts",
