@@ -1,32 +1,24 @@
-FROM python:3.11-slim
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim
 
+# Set the working directory in the container
 WORKDIR /app
 
-# Install system deps
-RUN apt-get update && apt-get install -y \
-    gcc libpq-dev git curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install
-# [MODIFIED] Removed 'backend/' from the path
+# Copy the requirements file into the container at /app
 COPY requirements.txt .
+
+# Install any needed packages specified in requirements.txt
+# Make sure 'google-cloud-storage' is listed in your requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install spaCy English model
-RUN python -m spacy download en_core_web_sm
+# Copy the rest of the application's code into the container
+# This includes your 'api' and 'models' directories, but NOT the old 'saved_models'
+COPY ./api /app/api
+COPY ./models /app/models
 
-# Copy project code + models
-# [MODIFIED] Removed 'backend/' from the paths
-COPY api/ /app/api/
-COPY models/ /app/models/
-COPY saved_models/ /app/saved_models/
+# Expose the port the app runs on
+EXPOSE 8000
 
-# Expose Cloud Run port
-EXPOSE 8080
-
-# Create database tables and run migrations
-WORKDIR /app/api
-RUN python -c "from database import init_db; init_db()"
-
-# Run FastAPI
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run main.py when the container launches
+# Use uvicorn to run the FastAPI application
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
