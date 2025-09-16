@@ -132,12 +132,16 @@ def network_analysis(data: NetworkData, orch: CybersecurityOrchestrator = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# [CORRECTED] Removed the db_session dependency from this endpoint
 @app.post("/analyze-text", tags=["Analysis"])
-def analyze_text(data: TextData, db_session: Session = Depends(db.get_db), orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+def analyze_text(data: TextData, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+    """
+    Analyzes text. Logging to a database is now handled by the alerts router.
+    """
     try:
         sensitive_result = orch.classify_sensitive_data(data.text)
         quality_result = orch.assess_data_quality(data.text)
-        # ... your database logging logic here ...
+        
         return {
             "analysis_type": "Text Analysis",
             "sensitive_data_analysis": sensitive_result,
@@ -146,8 +150,9 @@ def analyze_text(data: TextData, db_session: Session = Depends(db.get_db), orch:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during text analysis: {e}")
 
+# [CORRECTED] Removed the db_session dependency from this endpoint
 @app.post("/analyze-file", tags=["Analysis"])
-async def analyze_file(file: UploadFile = File(...), db_session: Session = Depends(db.get_db), orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+async def analyze_file(file: UploadFile = File(...), orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
     temp_dir = "tmp"
     os.makedirs(temp_dir, exist_ok=True)
     temp_file_path = os.path.join(temp_dir, file.filename)
@@ -155,7 +160,6 @@ async def analyze_file(file: UploadFile = File(...), db_session: Session = Depen
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         result = orch.analyze_file_for_threats(temp_file_path)
-        # ... your database logging logic here ...
         return {"analysis_type": "Static File Analysis", "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred during file analysis: {e}")
@@ -207,12 +211,11 @@ def assess_json_quality(payload: JsonData, orch: CybersecurityOrchestrator = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JSON quality assessment failed: {e}")
 
+# [CORRECTED] Removed the db_session dependency from this endpoint
 @app.post("/comprehensive-analysis", tags=["Enhanced Analysis"])
-def comprehensive_analysis(data: TextData, db_session: Session = Depends(db.get_db), orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+def comprehensive_analysis(data: TextData, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
     try:
-        result = orch.comprehensive_analysis(data.text)
-        # ... your database logging logic here ...
-        return result
+        return orch.comprehensive_analysis(data.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comprehensive analysis failed: {e}")
 
