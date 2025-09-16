@@ -38,3 +38,5 @@ Faker
 
 # For JWT authentication (future use)
 python-jose[cryptography]
+# firebase
+firebase-admin
