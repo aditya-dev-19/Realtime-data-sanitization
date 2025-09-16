@@ -29,4 +29,4 @@ WORKDIR /app/api
 # RUN python -c "from database import init_db; init_db()"
 
 # Run FastAPI
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
