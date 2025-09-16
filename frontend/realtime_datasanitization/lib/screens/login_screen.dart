@@ -10,44 +10,50 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();  // Form key for form validation
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String _error = '';
 
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
+    // First validate the form
+    if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+      return;
+    }
 
-      try {
-        final success = await context.read<AuthProvider>().login(
-              _emailController.text.trim(),
-              _passwordController.text,
-            );
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
-        if (!mounted) return;
-        
-        if (success) {
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          setState(() {
-            _error = 'Invalid email or password';
-          });
-        }
-      } catch (e) {
-        setState(() {
-          _error = e.toString().replaceAll('Exception: ', '');
-        });
-      } finally {
+    try {
+      final success = await context.read<AuthProvider>().login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+
+      if (!mounted) return;
+      
+      if (success) {
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          Navigator.pushReplacementNamed(context, '/home');
         }
+      } else {
+        setState(() {
+          _error = 'Invalid email or password';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+      debugPrint('Login error: $_error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -74,7 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
-          child: Column(
+          child: Form(
+            key: _formKey,  // Assign the form key to the Form widget
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Icon(Icons.shield_outlined,
@@ -188,6 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
             ],
+          ),
           ),
         ),
       ),

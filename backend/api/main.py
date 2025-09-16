@@ -32,22 +32,35 @@ except ImportError as e:
 # Import routers
 try:
     try:
-        from .routers.alerts import router as alerts_router
-        from .routers.users import router as users_router
+        from .routers import users
+        from .routers import alerts
+        users_router = users.router
+        alerts_router = alerts.router
     except ImportError as e:
         print(f"Relative import failed: {e}")
         try:
-            from routers.alerts import router as alerts_router
-            from routers.users import router as users_router
+            from routers import users
+            from routers import alerts
+            users_router = users.router
+            alerts_router = alerts.router
         except ImportError as e:
             print(f"Absolute import failed: {e}")
-            raise
-except ImportError as e:
-    print(f"Warning: Could not import routers: {e}")
-    # Create dummy routers to prevent import errors
-    from fastapi import APIRouter
-    alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
-    users_router = APIRouter(prefix="/users", tags=["users"])
+            # Create minimal working routers
+            from fastapi import APIRouter
+            users_router = APIRouter(prefix="/users", tags=["users"])
+            alerts_router = APIRouter(prefix="/alerts", tags=["alerts"])
+            
+            @users_router.post("/", response_model=dict)
+            async def create_user(user: dict):
+                return {"message": "User creation endpoint is not properly configured"}
+                
+            @users_router.post("/token", response_model=dict)
+            async def login(form_data: dict):
+                return {"message": "Login endpoint is not properly configured"}
+                
+except Exception as e:
+    print(f"Error setting up routers: {e}")
+    raise
 
 # --- 1. Initialize FastAPI app and Orchestrator ---
 # Import models to ensure they're registered with SQLAlchemy
@@ -291,6 +304,39 @@ async def test_alert():
 # Include the API routers
 app.include_router(alerts_router, prefix="/api/v1")  # Add version prefix
 app.include_router(users_router, prefix="/api/v1")   # Add version prefix
+
+# --- Test Registration Endpoint ---
+@app.post("/test-register", response_model=dict)
+async def test_register(user_data: dict):
+    """Test endpoint for user registration"""
+    from sqlalchemy.orm import Session
+    from database import SessionLocal
+    from models.user import User as UserModel
+    from api.auth import get_password_hash
+    
+    db = SessionLocal()
+    try:
+        # Check if user exists
+        db_user = db.query(UserModel).filter(UserModel.username == user_data.get('username')).first()
+        if db_user:
+            return {"status": "error", "message": "Username already registered"}
+            
+        # Create new user
+        hashed_password = get_password_hash(user_data.get('password', ''))
+        new_user = UserModel(
+            username=user_data.get('username'),
+            email=user_data.get('email'),
+            hashed_password=hashed_password
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return {"status": "success", "user_id": new_user.id}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
 
 # --- System Monitoring Endpoints ---
 @app.get("/health")

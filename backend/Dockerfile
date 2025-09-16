@@ -24,6 +24,9 @@ COPY saved_models/ /app/saved_models/
 # Expose Cloud Run port
 EXPOSE 8080
 
-# Run FastAPI
+# Create database tables and run migrations
 WORKDIR /app/api
+RUN python -c "from database import init_db; init_db()"
+
+# Run FastAPI
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
