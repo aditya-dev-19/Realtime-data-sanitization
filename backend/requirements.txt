@@ -40,3 +40,4 @@ Faker
 python-jose[cryptography]
 # firebase
 firebase-admin
+google-cloud-storage
