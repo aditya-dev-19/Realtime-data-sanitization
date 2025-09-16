@@ -1,24 +1,32 @@
-# Use an updated Python runtime as a parent image
 FROM python:3.11-slim
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
-COPY requirements.txt .
+# Install system deps
+RUN apt-get update && apt-get install -y \
+    gcc libpq-dev git curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
+# Copy requirements and install
+# [MODIFIED] Removed 'backend/' from the path
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application's code into the container
-COPY api/ /app/api
-COPY models/ /app/models
+# Install spaCy English model
+RUN python -m spacy download en_core_web_sm
 
-# Expose the port the app runs on (this is for documentation)
+# Copy project code + models
+# [MODIFIED] Removed 'backend/' from the paths
+COPY api/ /app/api/
+COPY models/ /app/models/
+# COPY saved_models/ /app/saved_models/
+
+# Expose Cloud Run port
 EXPOSE 8080
 
-# Run FastAPI
+# Create database tables and run migrations
 WORKDIR /app/api
+# RUN python -c "from database import init_db; init_db()"
 
-# [MODIFIED] Run main.py using the $PORT environment variable
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Run FastAPI
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
