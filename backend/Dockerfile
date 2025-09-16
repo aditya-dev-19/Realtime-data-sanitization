@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./api /app/api
 COPY ./models /app/models
 
-# Expose the port the app runs on
-EXPOSE 8000
+# Expose the port the app runs on (this is for documentation)
+EXPOSE 8080
 
-# Run main.py when the container launches
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# [MODIFIED] Run main.py using the $PORT environment variable
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
