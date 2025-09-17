@@ -47,7 +47,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF121212), // Dark background
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -66,7 +66,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1A1A1A),
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -74,7 +74,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         'Secure your data with our protection',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
-                          color: Colors.grey[600],
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -86,8 +86,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   TextFormField(
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      hintStyle: const TextStyle(color: Colors.grey),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                      filled: true,
+                      fillColor: Colors.grey[900],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.grey[300]!),
@@ -100,8 +103,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF4A6BFF)),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
                       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                     style: GoogleFonts.poppins(fontSize: 16),
@@ -139,8 +140,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF4A6BFF)),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
                       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                     style: GoogleFonts.poppins(fontSize: 16),
@@ -196,7 +195,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         child: Text(
                           'or continue with',
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
+                            color: Colors.white,
                             fontSize: 14,
                           ),
                         ),
@@ -229,7 +228,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         text: TextSpan(
                           text: 'Already have an account? ',
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
+                            color: Colors.white,
                             fontSize: 14,
                           ),
                           children: [
