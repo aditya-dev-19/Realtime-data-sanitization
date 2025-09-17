@@ -190,17 +190,20 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
+        
         // Map the API response to our expected format
         return {
           'status': data['status']?.toLowerCase() ?? 'unknown',
           'details': data['message'] ?? 'System status unknown',
           'timestamp': DateTime.now().toIso8601String(),
           'components': {
-            'orchestrator': data['orchestrator'],
-            'dynamic_behavior': data['dynamic_behavior'],
-            'network_traffic': data['network_traffic'],
-            'data_classification': data['data_classification'],
-            'enhanced_features': data['enhanced_features'] ?? false,
+            'orchestrator': data['components']?['orchestrator_status'] ?? 'unknown',
+            'database': data['components']?['database']?.toString().contains('error') 
+                ? 'error' 
+                : 'ok',
+            'network_traffic': 'ok', // Default value since not in response
+            'data_classification': 'ok', // Default value since not in response
+            'enhanced_features': false, // Default value
           },
           'totalScans': 0, // These will be updated when we have the actual endpoints
           'threatsDetected': 0,
