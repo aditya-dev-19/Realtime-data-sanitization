@@ -294,7 +294,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ..._buildComponentStatus(systemStatusProvider.systemStatus?['components'] ?? {}),
+                        ..._buildComponentStatus({
+                          'Database': systemStatusProvider.systemStatus?['components']?['database'] ?? 'unknown',
+                          'Orchestrator': systemStatusProvider.systemStatus?['components']?['orchestrator'] ?? 'unknown',
+                          'Network Traffic': systemStatusProvider.systemStatus?['components']?['network_traffic'] ?? 'unknown',
+                          'Data Classification': systemStatusProvider.systemStatus?['components']?['data_classification'] ?? 'unknown',
+                        }),
                       ],
                     ),
                   ),
@@ -306,20 +311,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _buildStatCard(
                       'Data Classification',
-                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      (systemStatusProvider.systemStatus?['components']?['data_classification']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.security,
-                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toLowerCase() == 'enhanced' 
+                      (systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toLowerCase() ?? '') == 'ok' 
                           ? Colors.green 
                           : Colors.orange,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Enhanced Features',
-                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true ? 'ENABLED' : 'DISABLED',
-                      Icons.auto_awesome,
-                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true 
-                          ? Colors.purple 
-                          : Colors.grey,
+                      'Database',
+                      (systemStatusProvider.systemStatus?['components']?['database']?.toString() ?? 'UNKNOWN').toUpperCase(),
+                      Icons.storage,
+                      (systemStatusProvider.systemStatus?['components']?['database']?.toString().toLowerCase() ?? '') == 'ok' 
+                          ? Colors.green 
+                          : Colors.red,
                     ),
                   ],
                 ),
@@ -328,18 +333,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _buildStatCard(
                       'Orchestrator',
-                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      (systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.sync,
-                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toLowerCase() == 'ok' 
+                      (systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toLowerCase() ?? '') == 'loaded' 
                           ? Colors.blue 
                           : Colors.red,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Network Traffic',
-                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      'Network',
+                      (systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.network_check,
-                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toLowerCase() == 'ok' 
+                      (systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toLowerCase() ?? '') == 'ok' 
                           ? Colors.teal 
                           : Colors.orange,
                     ),
