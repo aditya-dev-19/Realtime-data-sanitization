@@ -7,7 +7,7 @@ import '../models/alert.dart';
 
 class ApiService {
   // Base URL for the API with version prefix
-  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/api/v1';
+  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/';
   
   // Headers for API requests
   final Map<String, String> _headers = {
@@ -31,17 +31,20 @@ class ApiService {
   }
 
   // Auth
-  Future<Map<String, dynamic>> login(String username, String password) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final url = '$_baseUrl/token';
+      final url = '$_baseUrl/token'; // Correct endpoint
       debugPrint('Attempting login to: $url');
       
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json', // 👈 CHANGED: Header is now JSON
         },
-        body: 'username=${Uri.encodeComponent(username)}&password=${Uri.encodeComponent(password)}',
+        body: jsonEncode({ // 👈 CHANGED: Body is now a JSON object
+          'email': email,
+          'password': password,
+        }),
       );
 
       debugPrint('Login response status: ${response.statusCode}');
@@ -57,6 +60,10 @@ class ApiService {
         }
         return responseData;
       } else {
+        // Handle OAuth2-style errors which use "username" in the detail message
+        if (response.body.contains("Incorrect username or password")) {
+            throw Exception("Incorrect email or password");
+        }
         final error = jsonDecode(response.body);
         throw Exception(error['detail'] ?? 'Failed to login: ${response.statusCode}');
       }
@@ -66,10 +73,9 @@ class ApiService {
     }
   }
 
-  Future<void> register(String username, String email, String password) async {
+  Future<void> register(String email, String password) async { // 👈 CHANGED: Removed username
   try {
-    // Try without the /api/v1 prefix since it's not working
-    final url = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/register';
+    final url = '$_baseUrl/register'; // Correct endpoint
     debugPrint('Attempting registration at: $url');
     
     final response = await http.post(
@@ -78,8 +84,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: jsonEncode({
-        'username': username,
+      body: jsonEncode({ // 👈 CHANGED: Removed username from the body
         'email': email,
         'password': password,
       }),
