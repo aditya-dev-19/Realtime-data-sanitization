@@ -41,6 +41,8 @@ dependencies:
   pull_to_refresh: ^2.0.0 # For pull-to-refresh functionality
   cached_network_image: ^3.3.1 # For efficient image loading
   shimmer: ^3.0.0 # For loading placeholders
+  google_fonts: ^6.1.0 # For custom fonts
+  flutter_svg: ^2.0.10 # For SVG support
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -72,6 +74,7 @@ flutter:
   # Assets for the application
   assets:
     - assets/animations/
+    - assets/icons/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
