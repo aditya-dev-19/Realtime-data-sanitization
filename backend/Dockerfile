@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install
 # [MODIFIED] Removed 'backend/' from the path
-COPY requirements.txt .
+COPY . .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install spaCy English model
@@ -17,16 +18,16 @@ RUN python -m spacy download en_core_web_sm
 
 # Copy project code + models
 # [MODIFIED] Removed 'backend/' from the paths
-COPY api/ /app/api/
-COPY models/ /app/models/
+#COPY api/ /app/api/
+#COPY models/ /app/models/
 # COPY saved_models/ /app/saved_models/
 
 # Expose Cloud Run port
 EXPOSE 8080
 
 # Create database tables and run migrations
-WORKDIR /app/api
+#WORKDIR /app/api
 # RUN python -c "from database import init_db; init_db()"
 
 # Run FastAPI
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
