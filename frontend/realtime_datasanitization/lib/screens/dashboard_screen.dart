@@ -131,13 +131,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final List<Widget> statusWidgets = [];
     
     components.forEach((key, value) {
-      final status = value.toString().toLowerCase();
+      final status = value?.toString().toLowerCase() ?? 'unknown';
       Color statusColor;
       IconData statusIcon;
+      String displayStatus = status;
       
-      if (status == 'ok' || status == 'true' || status == 'enabled') {
+      // Special handling for database errors
+      if (key == 'Database' && status.contains('error:')) {
+        statusColor = Colors.red;
+        statusIcon = Icons.error_outline;
+        displayStatus = 'error';
+      } 
+      // Normal status handling
+      else if (status == 'ok' || status == 'true' || status == 'enabled' || status == 'loaded') {
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
+        displayStatus = 'ok';
       } else if (status == 'degraded' || status == 'warning') {
         statusColor = Colors.orange;
         statusIcon = Icons.warning_amber_rounded;
@@ -170,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const Spacer(),
               Text(
-                value.toString().toUpperCase(),
+                displayStatus.toUpperCase(),
                 style: TextStyle(
                   color: statusColor,
                   fontSize: 12,
