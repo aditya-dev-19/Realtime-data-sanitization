@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final size = MediaQuery.of(context).size;
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF121212), // Dark background
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1A1A1A),
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Sign in to continue to your secure space',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
-                          color: Colors.grey[600],
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -80,8 +80,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      labelStyle: TextStyle(color: Colors.grey[600]),
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      hintStyle: const TextStyle(color: Colors.grey),
                       prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                      filled: true,
+                      fillColor: Colors.grey[900],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: Colors.grey[300]!),
@@ -94,8 +97,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF4A6BFF)),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
                       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                     style: GoogleFonts.poppins(fontSize: 16),
@@ -133,8 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Color(0xFF4A6BFF)),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
                       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                     style: GoogleFonts.poppins(fontSize: 16),
@@ -160,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(
                         'Forgot Password?',
                         style: GoogleFonts.poppins(
-                          color: const Color(0xFF4A6BFF),
+                          color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -210,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(
                           'or continue with',
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
+                            color: Colors.white,
                             fontSize: 14,
                           ),
                         ),
@@ -243,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         text: TextSpan(
                           text: 'Don\'t have an account? ',
                           style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
+                            color: Colors.white,
                             fontSize: 14,
                           ),
                           children: [
