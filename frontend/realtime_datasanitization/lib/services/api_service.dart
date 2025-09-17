@@ -196,9 +196,9 @@ class ApiService {
           'status': data['status']?.toLowerCase() ?? 'unknown',
           'details': data['message'] ?? 'System status unknown',
           'timestamp': DateTime.now().toIso8601String(),
-          'components': {
-            'orchestrator': data['components']?['orchestrator_status'] ?? 'unknown',
-            'database': data['components']?['database']?.toString().contains('error') 
+          'components': <String, dynamic>{
+            'orchestrator': data['components']?['orchestrator_status']?.toString() ?? 'unknown',
+            'database': (data['components']?['database']?.toString().contains('error') ?? false) 
                 ? 'error' 
                 : 'ok',
             'network_traffic': 'ok', // Default value since not in response

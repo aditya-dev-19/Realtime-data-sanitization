@@ -228,15 +228,17 @@ def comprehensive_data_analysis(data: TextData, orch: CybersecurityOrchestrator 
         
 @app.get("/health", tags=["System Monitoring"])
 async def health_check():
+    # Check if using Firestore (which doesn't need a session)
     db_status = "ok"
     try:
-        db.SessionLocal().execute("SELECT 1")
+        # Try a simple Firestore operation to verify connection
+        db.collection('health_check').document('status').get()
     except Exception as e:
         db_status = f"error: {str(e)}"
     
     return {
-        "status": "healthy",
-        "message": "All systems operational",
+        "status": "healthy" if db_status == "ok" else "degraded",
+        "message": "All systems operational" if db_status == "ok" else "Some components are experiencing issues",
         "version": "1.0.0",
         "components": {
             "database": db_status,
