@@ -33,7 +33,7 @@ class ApiService {
   // Auth
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
-      final url = '$_baseUrl/users/token';
+      final url = '$_baseUrl/token';
       debugPrint('Attempting login to: $url');
       
       final response = await http.post(
