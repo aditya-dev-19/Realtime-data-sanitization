@@ -28,46 +28,46 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String username, String password) async {
-    _isLoading = true;
-    _error = '';
+  Future<bool> login(String email, String password) async { // 👈 CHANGED
+  _isLoading = true;
+  _error = '';
+  notifyListeners();
+
+  try {
+    final response = await _apiService.login(email, password); // 👈 CHANGED
+    _token = response['access_token'];
+    _isAuthenticated = true;
+    _apiService.setAuthToken(_token!);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', _token!);
+    _isLoading = false;
     notifyListeners();
-
-    try {
-      final response = await _apiService.login(username, password);
-      _token = response['access_token'];
-      _isAuthenticated = true;
-      _apiService.setAuthToken(_token!);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', _token!);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> register(String username, String email, String password) async {
-    _isLoading = true;
-    _error = '';
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    _isLoading = false;
     notifyListeners();
-
-    try {
-      await _apiService.register(username, email, password);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
+    return false;
   }
+}
+
+  Future<bool> register(String email, String password) async { // 👈 CHANGED
+  _isLoading = true;
+  _error = '';
+  notifyListeners();
+
+  try {
+    await _apiService.register(email, password); // 👈 CHANGED
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  } catch (e) {
+    _error = e.toString();
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+}
 
   Future<void> logout() async {
     _token = null;
