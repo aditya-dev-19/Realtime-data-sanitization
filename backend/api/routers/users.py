@@ -5,7 +5,7 @@ from ..firebase_admin import db # 👈 Import the Firestore client
 
 router = APIRouter()
 
-@router.post("/users/", response_model=schemas.User)
+@router.post("/register", response_model=schemas.User)
 def create_user(user: schemas.UserCreate):
     # Check if user already exists
     user_ref = db.collection('users').document(user.email)
