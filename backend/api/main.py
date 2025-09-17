@@ -254,4 +254,4 @@ def get_model_stats(orch: CybersecurityOrchestrator = Depends(get_orchestrator))
 # --- Include API Routers ---
 # These handle user authentication and alerts.
 app.include_router(alerts.router, prefix="/api/v1")
-app.include_router(users.router, prefix="/api/v1")
+app.include_router(users.router) # No prefix for the users router
