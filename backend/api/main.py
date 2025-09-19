@@ -7,10 +7,13 @@ from fastapi.responses import JSONResponse, Response
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from google.cloud import storage
+from dotenv import load_dotenv
+
 
 # --- Local Imports ---
 # No longer imports 'database' or SQLAlchemy models that were deleted.
 from .orchestrator import CybersecurityOrchestrator
+from .storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc
 from .routers import users, alerts
 from .firebase_admin import db # Using Firestore for all database operations
 
@@ -18,6 +21,12 @@ from .firebase_admin import db # Using Firestore for all database operations
 # This will hold the loaded models so they are accessible to your endpoints.
 orchestrator: CybersecurityOrchestrator = None
 
+# Add the project's root directory to the Python path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
+
+# Load environment variables from the .env file
+load_dotenv(os.path.join(project_root, '.env'))
 
 # --- GCS Model Download Function ---
 def download_models_from_gcs(bucket_name: str, destination_folder: str = "downloaded_models"):
@@ -253,6 +262,56 @@ def get_model_stats(orch: CybersecurityOrchestrator = Depends(get_orchestrator))
         return orch.get_model_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model stats: {e}")
+
+@app.post("/api/encrypt-upload/")
+async def upload_and_encrypt_file(file: UploadFile = File(...), sensitivity_score: float = 0.5):
+    """
+    Encrypts an uploaded file based on its sensitivity and stores it in cloud storage.
+    """
+    try:
+        file_bytes = await file.read()
+        
+        # Call the encryption and upload function
+        result = encrypt_and_upload_file(
+            file_bytes=file_bytes,
+            original_filename=file.filename,
+            sensitivity=sensitivity_score
+        )
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"File '{file.filename}' encrypted and uploaded successfully.",
+            "data": {
+                "firestore_doc_id": result["firestore_doc_id"],
+                "gcs_object_name": result["object_name"],
+                "encryption_type": result["cipher"]
+            }
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to encrypt and upload file: {str(e)}")
+
+@app.get("/api/download-decrypt/")
+async def download_and_decrypt_file(firestore_doc_id: str):
+    """
+    Retrieves and decrypts an encrypted file from cloud storage using its Firestore document ID.
+    """
+    try:
+        plaintext, metadata = download_and_decrypt_file_by_doc(firestore_doc_id)
+        
+        return Response(content=plaintext, media_type="application/octet-stream", headers={
+            "Content-Disposition": f'attachment; filename="{metadata["original_filename"]}"'
+        })
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download and decrypt file: {str(e)}")
+
+# Other existing endpoints can go here, e.g.,
+# @app.get("/health-check/")
+# async def health_check():
+#     return {"status": "ok"}
 
 # --- Include API Routers ---
 # These handle user authentication and alerts.

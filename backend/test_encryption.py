@@ -1,7 +1,7 @@
-# test_encryption.py
 import os
 import sys
-import io
+import requests
+import asyncio
 from pathlib import Path
 from dotenv import dotenv_values
 
@@ -23,66 +23,73 @@ try:
 
 except Exception as e:
     print(f"❌ Error loading .env file: {e}")
-    
-# Add project root to the Python path to allow for absolute imports
-project_root = Path(__file__).resolve().parent
-sys.path.append(str(project_root))
 
-from api.storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc
+# This script assumes your server is running on localhost at port 8000
+API_URL = "http://localhost:8000/api"
 
-def test_encryption_roundtrip():
+def test_api_endpoints():
     """
-    Tests the full encryption, upload, download, and decryption flow.
+    Tests the encryption and decryption API endpoints.
     """
-    print("--- Starting Encryption Test ---")
+    print("--- Starting API Endpoint Test ---")
     
-    # Check if a necessary environment variable is set
-    if not os.environ.get("KMS_PROJECT"):
-        print("❌ Error: KMS configuration is missing. Please check your .env file.")
-        print("Make sure it contains KMS_PROJECT, KMS_LOCATION, KMS_KEY_RING, and KMS_CRYPTO_KEY.")
-        return
-
-    # 1. Define test data
+    # 1. Define test data (High Sensitivity)
     plaintext = b"This is a secret test message to check if encryption is working correctly."
-    original_filename = "test_document.txt"
-    sensitivity_score = 0.95  # Use a high sensitivity score for AES-256-GCM
-
+    filename = "test_api_document.txt"
+    sensitivity_score = 0.95
+    
     print(f"Original plaintext: {plaintext.decode()}")
-    print(f"Original filename: {original_filename}")
+    print(f"Original filename: {filename}")
     print(f"Sensitivity score: {sensitivity_score}")
-    print("\n--- Encrypting and Uploading... ---")
+    print("\n--- Sending file to /api/encrypt-upload/ endpoint... ---")
 
     try:
-        # 2. Encrypt and upload the file
-        result = encrypt_and_upload_file(
-            file_bytes=plaintext,
-            original_filename=original_filename,
-            sensitivity=sensitivity_score
-        )
-        firestore_doc_id = result["firestore_doc_id"]
-        object_name = result["object_name"]
-
-        print("✅ Encryption and upload successful!")
+        # 2. Upload and encrypt the file via the API
+        files = {'file': (filename, plaintext, 'application/octet-stream')}
+        data = {'sensitivity_score': sensitivity_score}
+        
+        response = requests.post(f"{API_URL}/encrypt-upload/", files=files, data=data)
+        response.raise_for_status() # Raise an exception for bad status codes
+        
+        upload_result = response.json()
+        print("✅ File uploaded and encrypted successfully!")
+        print("Response:", upload_result)
+        
+        firestore_doc_id = upload_result['data']['firestore_doc_id']
+        gcs_object_name = upload_result['data']['gcs_object_name']
+        encryption_type = upload_result['data']['encryption_type']
+        
         print(f"Firestore Document ID: {firestore_doc_id}")
-        print(f"GCS Object Name: {object_name}")
-
-        print("\n--- Downloading and Decrypting... ---")
+        print(f"GCS Object Name: {gcs_object_name}")
+        print(f"Encryption Type: {encryption_type}")
         
-        # 3. Download and decrypt the file
-        recovered_plaintext, metadata = download_and_decrypt_file_by_doc(firestore_doc_id)
+        # 3. Download and decrypt the file via the API
+        print("\n--- Downloading file from /api/download-decrypt/ endpoint... ---")
+        download_response = requests.get(f"{API_URL}/download-decrypt/?firestore_doc_id={firestore_doc_id}")
+        download_response.raise_for_status()
         
-        print("✅ Download and decryption successful!")
+        recovered_plaintext = download_response.content
+        
+        print("✅ File downloaded and decrypted successfully!")
         print(f"Recovered plaintext: {recovered_plaintext.decode()}")
-        print(f"Retrieved metadata: {metadata}")
-
+        
         # 4. Verify the integrity
-        assert recovered_plaintext == plaintext
-        assert metadata["original_filename"] == original_filename
-        print("\n✅ Test Passed: Recovered plaintext matches original. Encryption is working correctly.")
-
+        if recovered_plaintext == plaintext:
+            print("\n✅ Test Passed: Recovered plaintext matches original. API endpoints are working correctly.")
+        else:
+            print("\n❌ Test Failed: Recovered plaintext does NOT match original.")
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Test Failed: An API request error occurred.")
+        print(f"Error details: {e}")
+        if 'response' in locals() and response is not None:
+            print(f"Server response content: {response.text}")
     except Exception as e:
-        print(f"❌ Test Failed: An error occurred.")
+        print(f"❌ Test Failed: An unexpected error occurred.")
         print(f"Error details: {e}")
 
 if __name__ == "__main__":
-    test_encryption_roundtrip()
+    # Ensure your FastAPI server is running in a separate terminal before running this script.
+    # Command to run the server:
+    # uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    test_api_endpoints()
