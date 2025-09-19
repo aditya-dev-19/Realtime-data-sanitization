@@ -4,16 +4,27 @@ import os
 import shutil
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse, Response
 from typing import List, Dict, Any
 import json
 from sqlalchemy.orm import Session
 
-# Import your main orchestrator class and database components
-from orchestrator import CybersecurityOrchestrator
-import database as db
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
 
+# Import your main orchestrator class and database components
+from .orchestrator import CybersecurityOrchestrator
+from . import database as db
 # Import routers
 from routers import alerts as alerts_router
+from models.alert import Alert
+
+# Load environment variables from .env file
+load_dotenv()
+
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
 
 # --- 1. Initialize FastAPI app and Orchestrator ---
 # Create database tables
@@ -276,3 +287,4 @@ def get_model_stats():
         return orchestrator.get_model_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model stats: {e}")
+

@@ -7,12 +7,16 @@ import sys
 from pathlib import Path
 import json
 from datetime import datetime
+import tensorflow as tf  # Add this import
+from typing import Optional  # Add this import
+
 
 # Add project root to the Python path to allow for absolute imports
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from tensorflow.keras.models import load_model
+# Use tf.keras instead of direct keras import
+# from tf.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import numpy as np
 import joblib
@@ -28,6 +32,8 @@ from models.data_classification.quality_assessor import DataQualityAssessor
 from models.data_classification.enhanced_models import EnhancedSensitiveClassifier, DataQualityAssessor as EnhancedDataQualityAssessor
 from models.data_classification.api_interface import DataClassificationAPI
 from models.data_classification.config import ClassifierConfig, QualityConfig
+
+from api.storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc
 
 class CybersecurityOrchestrator:
     def __init__(self, model_dir='../saved_models/'):
@@ -144,7 +150,8 @@ class CybersecurityOrchestrator:
     def _create_fallback_dynamic_model(self):
         """Create a simple fallback model for dynamic behavior analysis"""
         from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense
+        from tensorflow.keras import layers
+        Dense = layers.Dense
         
         # Simple feedforward model as fallback
         self.dynamic_model = Sequential([
@@ -409,3 +416,24 @@ class CybersecurityOrchestrator:
     def get_data_services_health(self):
         """Alias for health_check for backward compatibility."""
         return self.health_check()
+
+
+
+# api/storage_handler.py
+def encrypt_and_store_sanitized_file(self, file_bytes: bytes, original_filename: str, sensitivity_score: float, uploader_id: Optional[str] = None):
+    """
+    Encrypts and uploads a sanitized file to cloud storage.
+    """
+    try:
+        result = encrypt_and_upload_file(
+            file_bytes=file_bytes,
+            original_filename=original_filename,
+            sensitivity=sensitivity_score,
+            uploader_id=uploader_id,
+            model_version="classifier_v1" # You can update this to your current model version
+        )
+        print(f"✅ Encrypted file uploaded. Metadata stored in Firestore with doc ID: {result.get('firestore_doc_id')}")
+        return {"status": "success", "details": result}
+    except Exception as e:
+        print(f"❌ Failed to encrypt and upload file: {e}")
+        return {"status": "error", "message": str(e)}
