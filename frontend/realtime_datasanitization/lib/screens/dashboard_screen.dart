@@ -131,13 +131,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final List<Widget> statusWidgets = [];
     
     components.forEach((key, value) {
-      final status = value.toString().toLowerCase();
+      final status = value?.toString().toLowerCase() ?? 'unknown';
       Color statusColor;
       IconData statusIcon;
+      String displayStatus = status;
       
-      if (status == 'ok' || status == 'true' || status == 'enabled') {
+      // Special handling for database errors
+      if (key == 'Database' && status.contains('error:')) {
+        statusColor = Colors.red;
+        statusIcon = Icons.error_outline;
+        displayStatus = 'error';
+      } 
+      // Normal status handling
+      else if (status == 'ok' || status == 'true' || status == 'enabled' || status == 'loaded') {
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
+        displayStatus = 'ok';
       } else if (status == 'degraded' || status == 'warning') {
         statusColor = Colors.orange;
         statusIcon = Icons.warning_amber_rounded;
@@ -170,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const Spacer(),
               Text(
-                value.toString().toUpperCase(),
+                displayStatus.toUpperCase(),
                 style: TextStyle(
                   color: statusColor,
                   fontSize: 12,
@@ -294,7 +303,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ..._buildComponentStatus(systemStatusProvider.systemStatus?['components'] ?? {}),
+                        ..._buildComponentStatus({
+                          'Database': systemStatusProvider.systemStatus?['components']?['database'] ?? 'unknown',
+                          'Orchestrator': systemStatusProvider.systemStatus?['components']?['orchestrator'] ?? 'unknown',
+                          'Network Traffic': systemStatusProvider.systemStatus?['components']?['network_traffic'] ?? 'unknown',
+                          'Data Classification': systemStatusProvider.systemStatus?['components']?['data_classification'] ?? 'unknown',
+                        }),
                       ],
                     ),
                   ),
@@ -306,20 +320,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _buildStatCard(
                       'Data Classification',
-                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      (systemStatusProvider.systemStatus?['components']?['data_classification']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.security,
-                      systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toLowerCase() == 'enhanced' 
+                      (systemStatusProvider.systemStatus?['components']?['data_classification']?.toString().toLowerCase() ?? '') == 'ok' 
                           ? Colors.green 
                           : Colors.orange,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Enhanced Features',
-                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true ? 'ENABLED' : 'DISABLED',
-                      Icons.auto_awesome,
-                      systemStatusProvider.systemStatus?['components']?['enhanced_features'] == true 
-                          ? Colors.purple 
-                          : Colors.grey,
+                      'Database',
+                      (systemStatusProvider.systemStatus?['components']?['database']?.toString() ?? 'UNKNOWN').toUpperCase(),
+                      Icons.storage,
+                      (systemStatusProvider.systemStatus?['components']?['database']?.toString().toLowerCase() ?? '') == 'ok' 
+                          ? Colors.green 
+                          : Colors.red,
                     ),
                   ],
                 ),
@@ -328,18 +342,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     _buildStatCard(
                       'Orchestrator',
-                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      (systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.sync,
-                      systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toLowerCase() == 'ok' 
+                      (systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString().toLowerCase() ?? '') == 'loaded' 
                           ? Colors.blue 
                           : Colors.red,
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
-                      'Network Traffic',
-                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toUpperCase() ?? 'UNKNOWN',
+                      'Network',
+                      (systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.network_check,
-                      systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toLowerCase() == 'ok' 
+                      (systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString().toLowerCase() ?? '') == 'ok' 
                           ? Colors.teal 
                           : Colors.orange,
                     ),

@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../models/alert.dart';
 
 class ApiService {
-  // Base URL for the API
-  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app';
+  // Base URL for the API with version prefix
+  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/';
   
   // Headers for API requests
   final Map<String, String> _headers = {
@@ -29,6 +29,79 @@ class ApiService {
     _authToken = null;
     _headers.remove('Authorization');
   }
+
+  // Auth
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final url = '$_baseUrl/token'; // Correct endpoint
+      debugPrint('Attempting login to: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json', // 👈 CHANGED: Header is now JSON
+        },
+        body: jsonEncode({ // 👈 CHANGED: Body is now a JSON object
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      debugPrint('Login response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+        if (responseData is! Map<String, dynamic>) {
+          throw Exception('Invalid response format from server. Response: ${response.body}');
+        }
+        if (responseData['access_token'] == null) {
+          throw Exception('No access token in response. Response: ${response.body}');
+        }
+        return responseData;
+      } else {
+        // Handle OAuth2-style errors which use "username" in the detail message
+        if (response.body.contains("Incorrect username or password")) {
+            throw Exception("Incorrect email or password");
+        }
+        final error = jsonDecode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to login: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error in login: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> register(String email, String password) async { // 👈 CHANGED: Removed username
+  try {
+    final url = '$_baseUrl/register'; // Correct endpoint
+    debugPrint('Attempting registration at: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({ // 👈 CHANGED: Removed username from the body
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    debugPrint('Register response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to register: ${response.statusCode} - ${response.body}');
+    }
+  } catch (e) {
+    debugPrint('Error in register: $e');
+    rethrow;
+  }
+}
+
 
   // Alerts
   Future<List<dynamic>> getAlerts({int limit = 100, String? status, String? severity, int offset = 0}) async {
@@ -117,17 +190,20 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
+        
         // Map the API response to our expected format
         return {
           'status': data['status']?.toLowerCase() ?? 'unknown',
           'details': data['message'] ?? 'System status unknown',
           'timestamp': DateTime.now().toIso8601String(),
-          'components': {
-            'orchestrator': data['orchestrator'],
-            'dynamic_behavior': data['dynamic_behavior'],
-            'network_traffic': data['network_traffic'],
-            'data_classification': data['data_classification'],
-            'enhanced_features': data['enhanced_features'] ?? false,
+          'components': <String, dynamic>{
+            'orchestrator': data['components']?['orchestrator_status']?.toString() ?? 'unknown',
+            'database': (data['components']?['database']?.toString().contains('error') ?? false) 
+                ? 'error' 
+                : 'ok',
+            'network_traffic': 'ok', // Default value since not in response
+            'data_classification': 'ok', // Default value since not in response
+            'enhanced_features': false, // Default value
           },
           'totalScans': 0, // These will be updated when we have the actual endpoints
           'threatsDetected': 0,
