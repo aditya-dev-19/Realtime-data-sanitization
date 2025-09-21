@@ -1,96 +1,132 @@
-# Updated firebase_admin.py with proper error handling
+# Updated firebase_admin.py with proper Cloud Run configuration
 # Replace your backend/api/firebase_admin.py with this content
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 import os
+import json
 
-# --- Initialize Firebase Admin SDK ---
-# This setup is crucial for connecting to your Firestore database.
+# --- Initialize Firebase Admin SDK for Cloud Run ---
+print("🔧 Initializing Firebase Admin SDK...")
 
 try:
-    # Get project ID from environment variable or use default
-    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'realtime-data-sanitization')  # Replace with your actual project ID
+    # Get project ID from environment variable
+    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'realtime-data-sanitization')
+    print(f"📋 Using project ID: {project_id}")
     
-    # Initialize the app if not already initialized
+    # Check if Firebase app is already initialized
     try:
         app = firebase_admin.get_app()
         print("✅ Firebase app already initialized")
     except ValueError:
-        # Try to initialize with explicit project ID
+        # Initialize Firebase Admin SDK
+        print("🚀 Initializing new Firebase app...")
+        
+        # For Cloud Run, use Application Default Credentials
         try:
-            # Try with service account file if available
-            service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-            if service_account_path and os.path.exists(service_account_path):
-                cred = credentials.Certificate(service_account_path)
-                firebase_admin.initialize_app(cred, {'projectId': project_id})
-                print(f"✅ Firebase initialized with service account for project: {project_id}")
+            cred = credentials.ApplicationDefault()
+            firebase_admin.initialize_app(cred, {
+                'projectId': project_id
+            })
+            print(f"✅ Firebase initialized with Application Default Credentials for project: {project_id}")
+            
+        except Exception as adc_error:
+            print(f"⚠️  Application Default Credentials failed: {adc_error}")
+            
+            # Fallback: Try with service account key from environment
+            service_account_key = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+            if service_account_key:
+                try:
+                    service_account_info = json.loads(service_account_key)
+                    cred = credentials.Certificate(service_account_info)
+                    firebase_admin.initialize_app(cred, {
+                        'projectId': project_id
+                    })
+                    print(f"✅ Firebase initialized with service account key for project: {project_id}")
+                except Exception as key_error:
+                    print(f"⚠️  Service account key initialization failed: {key_error}")
+                    raise
             else:
-                # Initialize with project ID only (for local development)
-                firebase_admin.initialize_app(options={'projectId': project_id})
-                print(f"✅ Firebase initialized with project ID: {project_id}")
-                
-        except Exception as init_error:
-            print(f"❌ Firebase initialization failed: {init_error}")
-            print("⚠️  Firebase features will be disabled")
-            raise
+                print("❌ No valid authentication method found")
+                raise Exception("Firebase authentication failed - check service account configuration")
 
-    # Get Firestore client with explicit project ID
-    db = firestore.client(project=project_id)
+    # Initialize Firestore client
+    print("🔥 Connecting to Firestore...")
+    db = firestore.client()
+    
+    # Test the connection with a simple operation
+    try:
+        # Test read operation
+        test_collection = db.collection('_firebase_test')
+        test_doc_ref = test_collection.document('connection_test')
+        
+        # Try to set and get a test document
+        test_doc_ref.set({
+            'test': True,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'message': 'Firebase connection successful'
+        })
+        
+        # Verify we can read it back
+        doc_snapshot = test_doc_ref.get()
+        if doc_snapshot.exists:
+            print("✅ Firestore connection test successful - data written and read successfully")
+            # Clean up test document
+            test_doc_ref.delete()
+        else:
+            print("⚠️  Firestore test document was not found after writing")
+            
+    except Exception as test_error:
+        print(f"⚠️  Firestore connection test failed: {test_error}")
+        # Don't fail completely, just warn
+        
     print("✅ Firestore client initialized successfully")
 
 except Exception as e:
-    print(f"❌ Firebase/Firestore setup failed: {e}")
-    print("⚠️  Creating mock database client for development")
+    print(f"❌ CRITICAL: Firebase initialization failed completely: {e}")
+    print(f"❌ Error type: {type(e).__name__}")
+    print(f"❌ Error details: {str(e)}")
     
-    # Create a mock database client that doesn't crash the app
+    # Only use mock client as absolute last resort
+    print("❌ FALLING BACK TO MOCK CLIENT - DATA WILL NOT BE PERSISTED!")
+    
     class MockFirestoreClient:
         def collection(self, name):
-            return MockCollection()
-        
-        def document(self, path):
-            return MockDocument()
+            print(f"❌ MOCK: Accessing collection '{name}' - DATA WILL NOT BE SAVED!")
+            return MockCollection(name)
     
     class MockCollection:
+        def __init__(self, name):
+            self.name = name
+            
         def document(self, doc_id=None):
-            return MockDocument()
-        
-        def add(self, data):
-            print(f"Mock: Would add document with data: {data}")
-            return (MockDocument(), "mock_doc_id")
+            return MockDocument(f"{self.name}/{doc_id or 'auto-id'}")
         
         def stream(self):
             return []
-        
-        def order_by(self, field, **kwargs):
-            return self
-        
-        def limit(self, count):
-            return self
     
     class MockDocument:
-        def __init__(self):
-            self.id = "mock_document_id"
+        def __init__(self, path):
+            self.id = path.split('/')[-1]
         
         def set(self, data):
-            print(f"Mock: Would set document data: {data}")
-        
-        def update(self, data):
-            print(f"Mock: Would update document with: {data}")
+            print(f"❌ MOCK: Would set document with data: {data}")
+            print("❌ WARNING: This data is NOT being saved to Firebase!")
         
         def get(self):
-            return MockDocumentSnapshot()
+            return MockDocumentSnapshot(exists=False)
         
         def delete(self):
-            print("Mock: Would delete document")
+            pass
     
     class MockDocumentSnapshot:
-        def __init__(self):
-            self.exists = False
+        def __init__(self, exists=False):
+            self.exists = exists
         
         def to_dict(self):
             return {}
     
-    # Use mock client
     db = MockFirestoreClient()
-    print("⚠️  Using mock Firestore client - data will not persist!")
+
+# Export the database client
+__all__ = ['db']
