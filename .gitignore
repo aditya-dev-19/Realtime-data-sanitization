@@ -19,8 +19,8 @@ venv/
 *.db
 
 # Model directories - IMPORTANT
-saved_models/
-downloaded_models/
+backend/saved_models/
+backend/downloaded_models/
 
 # Other environment files
 *.ipynb_checkpoints
