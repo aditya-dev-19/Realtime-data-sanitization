@@ -31,17 +31,8 @@ steps:
     # Important: Ensure your Cloud Run service has permissions to access the GCS bucket.
     # This is typically done by assigning the 'Storage Object Viewer' role
     # to the service account used by Cloud Run.
-    - 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID,SECRET_KEY=$$SECRET_KEY'  # 👈 ADD THIS
-
-substitutions:
-  _SECRET_KEY: 'ec026aaa81c7762d33ad142dd8ca4801710747549d307b1a642ed2004ccf42c6'  # 👈 ADD THIS
-
-secretEnv: ['SECRET_KEY']  # 👈 ADD THIS
-
-availableSecrets:
-  secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/SECRET_KEY/versions/latest
-    env: 'SECRET_KEY'
+    - '--service-account=firebase-admin-sa@$PROJECT_ID.iam.gserviceaccount.com'
+    - '--set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
 
 images:
   - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
