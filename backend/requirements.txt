@@ -10,8 +10,9 @@ matplotlib
 seaborn
 
 # Deep Learning for Text Model (Hugging Face)
-transformers
-torch
+transformers==4.41.2
+safetensors==0.4.3
+torch==2.3.1
 datasets
 
 # Gradient Boosting for Network Model

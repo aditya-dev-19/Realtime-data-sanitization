@@ -1,528 +1,158 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
+
 import '../providers/alerts_provider.dart';
 import '../models/alert.dart';
 
-class AlertsScreen extends StatefulWidget {
-  const AlertsScreen({super.key});
+// Main page widget that displays the list of alerts and filtering options
+class AlertsPage extends StatefulWidget {
+  const AlertsPage({super.key});
 
   @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
+  State<AlertsPage> createState() => _AlertsPageState();
 }
 
-class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  String _selectedFilter = 'all';
+class _AlertsPageState extends State<AlertsPage> {
+  String _selectedSeverity = 'All';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    // Fetch alerts when the screen loads
-    Future.microtask(() => 
-      context.read<AlertsProvider>().fetchAlerts(forceRefresh: true)
-    );
+    // Fetch alerts when the page is first loaded
+    Future.microtask(() => Provider.of<AlertsProvider>(context, listen: false).fetchAlerts());
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  // Format timestamp to relative time (e.g., "2 minutes ago")
-  String _formatTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()} months ago';
-    } else if (difference.inDays > 7) {
-      return '${(difference.inDays / 7).floor()} weeks ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hours ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minutes ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  // Get color based on alert severity
+  // Helper function to get a color based on severity
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'critical':
-        return Colors.red[700]!;
+        return Colors.red[800]!;
       case 'high':
-        return Colors.red;
+        return Colors.orange[700]!;
       case 'medium':
-        return Colors.orange;
+        return Colors.amber[600]!;
       case 'low':
+        return Colors.blue[600]!;
       default:
-        return Colors.blue;
+        return Colors.grey;
     }
   }
 
-  // Get icon based on alert type
-  IconData _getAlertIcon(AlertType type) {
-    final typeString = type.toString().split('.').last;
-    switch (typeString) {
-      case 'threat_detected':
-        return Icons.security;
-      case 'system_issue':
-        return Icons.warning_amber_rounded;
-      case 'security_alert':
-        return Icons.notification_important;
-      case 'performance_issue':
-        return Icons.speed;
-      case 'configuration_change':
-        return Icons.settings;
-      default:
-        return Icons.notifications;
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    final alertsProvider = Provider.of<AlertsProvider>(context);
 
-  // Get status text
-  String _getStatusText(AlertStatus status) {
-    return status.toString().split('.').last.replaceAll('_', ' ');
-  }
+    final filteredAlerts = alertsProvider.alerts.where((alert) {
+      if (_selectedSeverity == 'All') {
+        return true;
+      }
+      return alert.severity == _selectedSeverity;
+    }).toList();
 
-  // Build alert item
-  Widget _buildAlertItem(Alert alert, AlertsProvider provider) {
-    final severityString = alert.severity.toString().split('.').last;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      color: const Color(0xFF1E2C42),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(
-          color: _getSeverityColor(severityString).withOpacity(0.5),
-          width: 1.0,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          // Mark as read on tap if unread
-          if (!alert.isRead) {
-            provider.markAsRead(alert.id);
-          }
-          // Show alert details
-          _showAlertDetails(alert, provider);
-        },
-        borderRadius: BorderRadius.circular(12.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Alert Icon
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: _getSeverityColor(alert.severity.toString().split('.').last).withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _getAlertIcon(alert.type),
-                  color: _getSeverityColor(alert.severity.toString().split('.').last),
-                  size: 20.0,
-                ),
-              ),
-              const SizedBox(width: 16.0),
-              // Alert Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title and Status
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            alert.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.0,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0,
-                            vertical: 2.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey[800],
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                          child: Text(
-                            _getStatusText(alert.status),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12.0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4.0),
-                    // Description
-                    if (alert.description != null && alert.description!.isNotEmpty)
-                      Text(
-                        alert.description!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14.0,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    const SizedBox(height: 8.0),
-                    // Timestamp and Actions
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _formatTimeAgo(alert.createdAt),
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 12.0,
-                          ),
-                        ),
-                        // Action buttons
-                        Row(
-                          children: [
-                            if (alert.status == AlertStatus.open)
-                              IconButton(
-                                icon: const Icon(Icons.check_circle_outline, size: 20.0),
-                                color: Colors.green,
-                                onPressed: () => provider.updateAlertStatus(
-                                  alert.id,
-                                  AlertStatus.resolved,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Mark as resolved',
-                              ),
-                            if (alert.status != AlertStatus.dismissed)
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 20.0),
-                                color: Colors.grey,
-                                onPressed: () => provider.updateAlertStatus(
-                                  alert.id,
-                                  AlertStatus.dismissed,
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                tooltip: 'Dismiss',
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Show alert details dialog
-  void _showAlertDetails(Alert alert, AlertsProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2C42),
-        title: Row(
-          children: [
-            Icon(
-              _getAlertIcon(alert.type),
-              color: _getSeverityColor(alert.severity.toString().split('.').last),
-            ),
-            const SizedBox(width: 12.0),
-            Expanded(
-              child: Text(
-                alert.title,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Status and Timestamp
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0,
-                      vertical: 4.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blueGrey[800],
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    child: Text(
-                      _getStatusText(alert.status),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.0,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${DateFormat('MMM d, y').format(alert.createdAt)} • ${DateFormat('h:mm a').format(alert.createdAt)}',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12.0,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16.0),
-              // Description
-              if (alert.description != null && alert.description!.isNotEmpty)
-                Text(
-                  alert.description!,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14.0,
-                  ),
-                ),
-              const SizedBox(height: 16.0),
-              // Metadata
-              if (alert.metadata != null && alert.metadata!.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Details:',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14.0,
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    Container(
-                      padding: const EdgeInsets.all(12.0),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      child: Text(
-                        alert.metadata.toString(),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12.0,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Security Alerts'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CLOSE'),
+          // Refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => alertsProvider.fetchAlerts(),
           ),
-          if (alert.status == AlertStatus.open)
-            ElevatedButton(
-              onPressed: () {
-                provider.updateAlertStatus(alert.id, AlertStatus.resolved);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Alert marked as resolved')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('RESOLVE'),
-            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildFilterChips(),
+          Expanded(
+            child: alertsProvider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredAlerts.isEmpty
+                    ? const Center(child: Text('No alerts found.'))
+                    : ListView.builder(
+                        itemCount: filteredAlerts.length,
+                        itemBuilder: (ctx, i) => AlertListItem(
+                          alert: filteredAlerts[i],
+                          severityColor: _getSeverityColor(filteredAlerts[i].severity),
+                        ),
+                      ),
+          ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final alertsProvider = context.watch<AlertsProvider>();
-    
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0A1A2F),
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: const Text(
-            "Alerts",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          centerTitle: true,
-          iconTheme: const IconThemeData(color: Colors.white),
-          bottom: TabBar(
-            controller: _tabController,
-            indicatorColor: Colors.blue,
-            labelColor: Colors.blue,
-            unselectedLabelColor: Colors.grey,
-            tabs: const [
-              Tab(text: 'All'),
-              Tab(text: 'Unread'),
-              Tab(text: 'Critical'),
-            ],
-          ),
-          actions: [
-            if (alertsProvider.unreadCount > 0)
-              IconButton(
-                icon: const Icon(Icons.checklist_rtl, color: Colors.white),
-                onPressed: () {
-                  alertsProvider.markAllAsRead();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('All alerts marked as read')),
-                  );
-                },
-                tooltip: 'Mark all as read',
-              ),
-          ],
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // All Alerts Tab
-            _buildAlertsList(
-              alerts: alertsProvider.alerts,
-              isLoading: alertsProvider.isLoading,
-              error: alertsProvider.error,
-              onRefresh: () => alertsProvider.fetchAlerts(forceRefresh: true),
-            ),
-            // Unread Alerts Tab
-            _buildAlertsList(
-              alerts: alertsProvider.alerts.where((a) => !a.isRead).toList(),
-              isLoading: alertsProvider.isLoading,
-              error: alertsProvider.error,
-              onRefresh: () => alertsProvider.fetchAlerts(forceRefresh: true),
-              emptyMessage: 'No unread alerts',
-            ),
-            // Critical Alerts Tab
-            _buildAlertsList(
-              alerts: alertsProvider.getCriticalAlerts(),
-              isLoading: alertsProvider.isLoading,
-              error: alertsProvider.error,
-              onRefresh: () => alertsProvider.fetchAlerts(forceRefresh: true),
-              emptyMessage: 'No critical alerts',
-            ),
-          ],
-        ),
+  // Builds the filter chips for alert severity
+  Widget _buildFilterChips() {
+    final severities = ['All', 'Low', 'Medium', 'High', 'Critical'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: Wrap(
+        spacing: 8.0,
+        children: severities.map((severity) {
+          return ChoiceChip(
+            label: Text(severity),
+            selected: _selectedSeverity == severity,
+            onSelected: (isSelected) {
+              if (isSelected) {
+                setState(() {
+                  _selectedSeverity = severity;
+                });
+              }
+            },
+            selectedColor: _getSeverityColor(severity).withOpacity(0.3),
+          );
+        }).toList(),
       ),
     );
   }
-  
-  Widget _buildAlertsList({
-    required List<Alert> alerts,
-    required bool isLoading,
-    required String error,
-    required VoidCallback onRefresh,
-    String emptyMessage = 'No alerts found',
-  }) {
-    return RefreshIndicator(
-      onRefresh: () async => onRefresh(),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "${alerts.length} ${alerts.length == 1 ? 'Alert' : 'Alerts'}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (alerts.isNotEmpty && alerts.any((a) => !a.isRead))
-                  TextButton(
-                    onPressed: () {
-                      final provider = context.read<AlertsProvider>();
-                      provider.markAllAsRead();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('All alerts marked as read')),
-                      );
-                    },
-                    child: const Text(
-                      'Mark all as read',
-                      style: TextStyle(color: Colors.blue),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
+}
 
-            if (isLoading && alerts.isEmpty)
-              const Center(
-                child: CircularProgressIndicator(),
-              )
-            else if (error.isNotEmpty)
-              Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading alerts: $error',
-                      style: const TextStyle(color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => onRefresh(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
+// Widget for a single item in the alerts list
+class AlertListItem extends StatelessWidget {
+  final Alert alert;
+  final Color severityColor;
+
+  const AlertListItem({
+    super.key,
+    required this.alert,
+    required this.severityColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      elevation: 2,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AlertDetailsPage(alert: alert),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            // Severity indicator bar
+            Container(
+              width: 5,
+              height: 80,
+              color: severityColor,
+            ),
+            Expanded(
+              child: ListTile(
+                title: Text(
+                  alert.title,
+                  style: TextStyle(
+                    fontWeight: alert.isRead ? FontWeight.normal : FontWeight.bold,
+                  ),
                 ),
-              )
-            else if (alerts.isEmpty)
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.notifications_off, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text(
-                      emptyMessage,
-                      style: const TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ...alerts.map((alert) => _buildAlertItem(alert, context.read<AlertsProvider>())),
+                subtitle: Text('${alert.source} • ${timeago.format(alert.timestamp)}'),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            ),
           ],
         ),
       ),
@@ -530,3 +160,135 @@ class _AlertsScreenState extends State<AlertsScreen> with SingleTickerProviderSt
   }
 }
 
+// Page to show the full details of a selected alert
+class AlertDetailsPage extends StatelessWidget {
+  final Alert alert;
+
+  const AlertDetailsPage({super.key, required this.alert});
+
+  // Helper function to get a color based on severity
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'critical': return Colors.red[800]!;
+      case 'high': return Colors.orange[700]!;
+      case 'medium': return Colors.amber[600]!;
+      case 'low': return Colors.blue[600]!;
+      default: return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(alert.title),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailItem('Severity', alert.severity, 
+              valueColor: _getSeverityColor(alert.severity)),
+            _buildDetailItem('Timestamp', 
+              DateFormat.yMMMd().add_jms().format(alert.timestamp)),
+            _buildDetailItem('Source', alert.source),
+            _buildDetailItem('Description', alert.description),
+            const Divider(height: 32),
+            Text(
+              'Technical Details',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            // Dynamically build the details view based on the alert 'type'
+            _buildDetailsView(alert.details),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Builds a consistent key-value display for detail items
+  Widget _buildDetailItem(String title, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(fontSize: 16, color: valueColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Renders the specific details based on the alert type from the backend
+  Widget _buildDetailsView(Map<String, dynamic> details) {
+    final type = details['type'];
+    final recommendation = details['recommendation'] as String?;
+
+    List<Widget> detailWidgets = [];
+
+    // Add specific details based on type
+    switch (type) {
+      case 'phishing':
+        detailWidgets.add(_buildDetailItem('Confidence', '${(details['confidence'] * 100).toStringAsFixed(2)}%'));
+        detailWidgets.add(_buildDetailItem('Text Analyzed', details['text_analyzed']));
+        break;
+      case 'code_injection':
+        detailWidgets.add(_buildDetailItem('Threat Score', details['score'].toString()));
+        detailWidgets.add(_buildDetailItem('Vulnerable String', details['vulnerable_string']));
+        break;
+      case 'malicious_file':
+        detailWidgets.add(_buildDetailItem('File Name', details['file_name']));
+        detailWidgets.add(_buildDetailItem('Threat Type', details['threat_type']));
+        break;
+      case 'network_anomaly':
+        detailWidgets.add(_buildDetailItem('Reason', details['reason']));
+        break;
+      case 'sensitive_data':
+         detailWidgets.add(_buildDetailItem('Data Types Found', (details['data_types_found'] as List).join(', ')));
+        break;
+      default:
+        // Fallback for any other type
+        details.forEach((key, value) {
+          if (key != 'type' && key != 'recommendation') {
+            detailWidgets.add(_buildDetailItem(key, value.toString()));
+          }
+        });
+    }
+
+    // Add recommendation card if it exists
+    if (recommendation != null) {
+      detailWidgets.add(
+        Card(
+          color: Colors.blueGrey[800],
+          margin: const EdgeInsets.only(top: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Recommendation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Text(recommendation),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: detailWidgets,
+    );
+  }
+}

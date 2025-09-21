@@ -14,23 +14,34 @@ try:
     from tensorflow.keras.models import load_model, Sequential
     from tensorflow.keras.layers import Dense
     from tensorflow.keras.preprocessing.sequence import pad_sequences
+    TF_AVAILABLE = True
 except ImportError:
     load_model, Sequential, Dense, pad_sequences = None, None, None, None
+    TF_AVAILABLE = False
     print("Warning: TensorFlow not available. Dynamic behavior analysis will be disabled.")
 
 try:
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    TORCH_AVAILABLE = True
 except ImportError:
     torch, AutoModelForSequenceClassification, AutoTokenizer = None, None, None
+    TORCH_AVAILABLE = False
     print("Warning: PyTorch/Transformers not available. Phishing and code injection detection will be disabled.")
 
 # --- Local Module Imports ---
+# Fix the import issue by using absolute imports when relative imports fail
+DataClassificationAPI = None
 try:
+    # Try relative import first (for when running as part of the package)
     from .models.data_classification.api_interface import DataClassificationAPI
 except ImportError:
-    print("Warning: Could not import data classification modules. This feature will be disabled.")
-    DataClassificationAPI = None
+    try:
+        # Try absolute import as fallback
+        from models.data_classification.api_interface import DataClassificationAPI
+    except ImportError:
+        print("Warning: Could not import data classification modules. This feature will be disabled.")
+        DataClassificationAPI = None
 
 
 class CybersecurityOrchestrator:
@@ -47,8 +58,19 @@ class CybersecurityOrchestrator:
         """
         print(f"Initializing Cybersecurity Orchestrator from model directory: '{model_dir}'")
         self.model_dir = Path(model_dir)
-        self.device = "cuda" if torch and torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if TORCH_AVAILABLE and torch.cuda.is_available() else "cpu"
         print(f"🧠 Using device: {self.device}")
+
+        # Initialize model placeholders
+        self.dynamic_model = None
+        self.iso_forest = None
+        self.ids_model = None
+        self.network_scaler = None
+        self.phishing_model = None
+        self.phishing_tokenizer = None
+        self.code_injection_model = None
+        self.code_injection_tokenizer = None
+        self.data_classification_api = None
 
         # --- Load All Models ---
         self._load_dynamic_behavior_model()
@@ -71,18 +93,26 @@ class CybersecurityOrchestrator:
 
     def _load_dynamic_behavior_model(self):
         """Loads the dynamic behavior analysis model."""
-        if not Sequential:
+        if not TF_AVAILABLE or not Sequential:
              print("⚠️  Dynamic behavior analysis disabled because TensorFlow is not installed.")
              self.dynamic_model = None
+             self.sequence_length = 100
              return
-        # Using a simple fallback model to avoid Keras version compatibility issues.
-        self.dynamic_model = Sequential([
-            Dense(64, activation='relu', input_shape=(100,)),
-            Dense(32, activation='relu'),
-            Dense(1, activation='sigmoid')
-        ])
+        
+        # Try to load the actual model first, fall back to simple model if needed
+        model_path = self.model_dir / 'dynamic_behavior_analyzer.h5'
+        if model_path.exists():
+            self.dynamic_model = self._load_model(load_model, "Dynamic Behavior Analyzer", model_path)
+        else:
+            # Using a simple fallback model to avoid Keras version compatibility issues.
+            self.dynamic_model = Sequential([
+                Dense(64, activation='relu', input_shape=(100,)),
+                Dense(32, activation='relu'),
+                Dense(1, activation='sigmoid')
+            ])
+            print("✅ Fallback Dynamic Behavior Analyzer created.")
+        
         self.sequence_length = 100
-        print("✅ Fallback Dynamic Behavior Analyzer created.")
         
     def _load_network_traffic_models(self):
         """Loads all models related to network traffic analysis."""
@@ -94,7 +124,7 @@ class CybersecurityOrchestrator:
 
     def _load_transformer_models(self):
         """Loads transformer-based models for phishing and code injection."""
-        if not AutoTokenizer:
+        if not TORCH_AVAILABLE or not AutoTokenizer:
             print("⚠️  Transformer-based detection disabled because PyTorch/Transformers are not installed.")
             self.phishing_model, self.phishing_tokenizer = None, None
             self.code_injection_model, self.code_injection_tokenizer = None, None
@@ -103,15 +133,17 @@ class CybersecurityOrchestrator:
         phishing_path = self.model_dir / "phishing_model_v2"
         code_injection_path = self.model_dir / "code_injection_model_prod"
 
-        self.phishing_tokenizer = self._load_model(AutoTokenizer.from_pretrained, "Phishing Tokenizer", phishing_path)
-        self.phishing_model = self._load_model(AutoModelForSequenceClassification.from_pretrained, "Phishing Model", phishing_path)
-        if self.phishing_model:
-            self.phishing_model.to(self.device)
+        if phishing_path.exists():
+            self.phishing_tokenizer = self._load_model(AutoTokenizer.from_pretrained, "Phishing Tokenizer", phishing_path)
+            self.phishing_model = self._load_model(AutoModelForSequenceClassification.from_pretrained, "Phishing Model", phishing_path)
+            if self.phishing_model:
+                self.phishing_model.to(self.device)
 
-        self.code_injection_tokenizer = self._load_model(AutoTokenizer.from_pretrained, "Code Injection Tokenizer", code_injection_path)
-        self.code_injection_model = self._load_model(AutoModelForSequenceClassification.from_pretrained, "Code Injection Model", code_injection_path)
-        if self.code_injection_model:
-            self.code_injection_model.to(self.device)
+        if code_injection_path.exists():
+            self.code_injection_tokenizer = self._load_model(AutoTokenizer.from_pretrained, "Code Injection Tokenizer", code_injection_path)
+            self.code_injection_model = self._load_model(AutoModelForSequenceClassification.from_pretrained, "Code Injection Model", code_injection_path)
+            if self.code_injection_model:
+                self.code_injection_model.to(self.device)
             
     def _load_data_classification_api(self):
         """Initializes the data classification and quality assessment API."""
@@ -128,16 +160,18 @@ class CybersecurityOrchestrator:
             self.data_classification_api = None
 
     # --- Analysis Methods ---
-    # (Your analysis methods like analyze_dynamic_behavior, analyze_network_traffic, etc. remain here without change)
-    # They will correctly use the models loaded in the __init__ method.
     def analyze_dynamic_behavior(self, call_sequence: list[int]):
         """Analyzes a sequence of system calls with the LSTM model."""
         if self.dynamic_model is None:
             return {"status": "Model unavailable", "confidence": 0.0, "error": "Dynamic behavior analyzer not loaded"}
         
         try:
-            padded_sequence = pad_sequences([call_sequence], maxlen=self.sequence_length, padding='post', truncating='post')
-            prediction_prob = self.dynamic_model.predict(padded_sequence)[0][0]
+            if TF_AVAILABLE and pad_sequences:
+                padded_sequence = pad_sequences([call_sequence], maxlen=self.sequence_length, padding='post', truncating='post')
+                prediction_prob = self.dynamic_model.predict(padded_sequence)[0][0]
+            else:
+                # Fallback prediction
+                prediction_prob = 0.3  # Default low-risk prediction
             
             if prediction_prob > 0.5:
                 return {"status": "Attack Behavior Detected", "confidence": float(prediction_prob)}
@@ -175,22 +209,14 @@ class CybersecurityOrchestrator:
             # Use enhanced API interface if available
             if self.data_classification_api:
                 return self.data_classification_api.classify(text)
-            
-            # Use enhanced classifier if available
-            elif self.enhanced_sensitive_classifier:
-                result = self.enhanced_sensitive_classifier.classify_text(text)
-                return {
-                    "classification": result.get('classification', 'UNKNOWN'),
-                    "confidence": result.get('confidence', 0.0),
-                    "details": result.get('detected_patterns', []),
-                    "text_length": result.get('text_length', 0),
-                    "patterns_found": result.get('patterns_found', 0)
-                }
-            
-            # Fallback to original classifier
             else:
-                prediction = self.sensitive_classifier.predict([text])
-                return {"data_type": prediction[0], "details": "Model classified text content."}
+                # Fallback basic implementation
+                return {
+                    "classification": "UNKNOWN",
+                    "confidence": 0.5,
+                    "details": "Enhanced data classification not available",
+                    "error": "Data classification API not loaded"
+                }
                 
         except Exception as e:
             return {"error": f"Classification failed: {str(e)}", "classification": "ERROR"}
@@ -202,10 +228,6 @@ class CybersecurityOrchestrator:
             if self.data_classification_api and isinstance(data, dict):
                 return self.data_classification_api.assess_data_quality(data)
             
-            # Use enhanced quality assessor if available
-            elif self.enhanced_quality_assaessor and isinstance(data, dict):
-                return self.enhanced_quality_assessor.assess_json_quality(data)
-            
             # Handle list/array input (original functionality)
             elif isinstance(data, (list, np.ndarray)):
                 if isinstance(data, list):
@@ -213,12 +235,12 @@ class CybersecurityOrchestrator:
                 else:
                     features_2d = data.reshape(1, -1) if data.ndim == 1 else data
                 
-                quality_score = self.quality_assessor.predict(features_2d)
-                return {"quality_score": quality_score[0], "recommendation": "Review data if score is low."}
+                # Simple quality assessment fallback
+                quality_score = min(1.0, max(0.0, 1.0 - np.std(features_2d) / (np.mean(np.abs(features_2d)) + 1e-6)))
+                return {"quality_score": quality_score, "recommendation": "Review data if score is low."}
             
             # Handle string input for text quality assessment
             elif isinstance(data, str):
-                # Simple text quality assessment
                 quality_score = 1.0 if data and data.strip() else 0.0
                 return {
                     "quality_score": quality_score,
@@ -239,6 +261,7 @@ class CybersecurityOrchestrator:
                 return self.data_classification_api.comprehensive_analysis(text)
             else:
                 # Fallback implementation
+                from datetime import datetime
                 sensitive_result = self.classify_sensitive_data(text)
                 quality_result = self.assess_data_quality(text)
                 
@@ -331,8 +354,11 @@ class CybersecurityOrchestrator:
         }
         
         if self.data_classification_api:
-            api_health = self.data_classification_api.health_check()
-            status.update(api_health)
+            try:
+                api_health = self.data_classification_api.health_check()
+                status.update(api_health)
+            except Exception as e:
+                status["data_classification_error"] = str(e)
             
         return status
     
