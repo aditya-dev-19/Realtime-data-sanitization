@@ -25,7 +25,7 @@ steps:
     - 'managed'
     - '--allow-unauthenticated'
     # [CORRECTED] Use valid flags for resources and timeout
-    - '--memory=2Gi'                # Allocate more memory for loading models
+    - '--memory=4Gi'                # Allocate more memory for loading models
     - '--timeout=900'               # Increase timeout to 15 minutes (900 seconds)
     - '--cpu-boost'                 # Enable CPU boost for faster startup
     # Important: Ensure your Cloud Run service has permissions to access the GCS bucket.
