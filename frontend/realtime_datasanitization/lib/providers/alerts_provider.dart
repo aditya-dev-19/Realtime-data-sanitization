@@ -85,7 +85,7 @@ class AlertsProvider with ChangeNotifier {
   }
   
   // Get a specific alert by ID
-  Alert? getAlertById(int id) {
+  Alert? getAlertById(String id) {
     try {
       return _alerts.firstWhere((alert) => alert.id == id);
     } catch (e) {
@@ -94,7 +94,7 @@ class AlertsProvider with ChangeNotifier {
   }
   
   // Update alert status
-  Future<void> updateAlertStatus(int alertId, AlertStatus newStatus) async {
+  Future<void> updateAlertStatus(String alertId, AlertStatus newStatus) async {
     final index = _alerts.indexWhere((alert) => alert.id == alertId);
     if (index == -1) return;
     
@@ -112,7 +112,7 @@ class AlertsProvider with ChangeNotifier {
     
     // Update on the server
     try {
-      await _apiService.updateAlertStatus(alertId, newStatus);
+      await _apiService.updateAlertStatus(int.parse(alertId), newStatus);
     } catch (e) {
       // Revert if the API call fails
       _alerts[index] = currentAlert;
@@ -122,7 +122,7 @@ class AlertsProvider with ChangeNotifier {
   }
   
   // Mark an alert as read (alias for updating status to resolved)
-  Future<void> markAsRead(int alertId) async {
+  Future<void> markAsRead(String alertId) async {
     await updateAlertStatus(alertId, AlertStatus.resolved);
   }
   

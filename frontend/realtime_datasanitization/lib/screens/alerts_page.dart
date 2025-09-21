@@ -25,15 +25,15 @@ class _AlertsPageState extends State<AlertsPage> {
   }
 
   // Helper function to get a color based on severity
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
+  Color _getSeverityColor(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.critical:
         return Colors.red[800]!;
-      case 'high':
+      case AlertSeverity.high:
         return Colors.orange[700]!;
-      case 'medium':
+      case AlertSeverity.medium:
         return Colors.amber[600]!;
-      case 'low':
+      case AlertSeverity.low:
         return Colors.blue[600]!;
       default:
         return Colors.grey;
@@ -48,7 +48,7 @@ class _AlertsPageState extends State<AlertsPage> {
       if (_selectedSeverity == 'All') {
         return true;
       }
-      return alert.severity == _selectedSeverity;
+      return alert.severity.toString().split('.').last.toLowerCase() == _selectedSeverity.toLowerCase();
     }).toList();
 
     return Scaffold(
@@ -83,6 +83,21 @@ class _AlertsPageState extends State<AlertsPage> {
     );
   }
 
+  // Helper method to parse selected severity string to AlertSeverity enum
+  AlertSeverity _parseSelectedSeverity(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'critical':
+        return AlertSeverity.critical;
+      case 'high':
+        return AlertSeverity.high;
+      case 'medium':
+        return AlertSeverity.medium;
+      case 'low':
+      default:
+        return AlertSeverity.low;
+    }
+  }
+
   // Builds the filter chips for alert severity
   Widget _buildFilterChips() {
     final severities = ['All', 'Low', 'Medium', 'High', 'Critical'];
@@ -101,7 +116,7 @@ class _AlertsPageState extends State<AlertsPage> {
                 });
               }
             },
-            selectedColor: _getSeverityColor(severity).withOpacity(0.3),
+            selectedColor: severity == 'All' ? Colors.blue.withOpacity(0.3) : _getSeverityColor(_parseSelectedSeverity(severity)).withOpacity(0.3),
           );
         }).toList(),
       ),
@@ -167,12 +182,12 @@ class AlertDetailsPage extends StatelessWidget {
   const AlertDetailsPage({super.key, required this.alert});
 
   // Helper function to get a color based on severity
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical': return Colors.red[800]!;
-      case 'high': return Colors.orange[700]!;
-      case 'medium': return Colors.amber[600]!;
-      case 'low': return Colors.blue[600]!;
+  Color _getSeverityColor(AlertSeverity severity) {
+    switch (severity) {
+      case AlertSeverity.critical: return Colors.red[800]!;
+      case AlertSeverity.high: return Colors.orange[700]!;
+      case AlertSeverity.medium: return Colors.amber[600]!;
+      case AlertSeverity.low: return Colors.blue[600]!;
       default: return Colors.grey;
     }
   }
@@ -188,7 +203,7 @@ class AlertDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailItem('Severity', alert.severity, 
+            _buildDetailItem('Severity', alert.severity.toString().split('.').last.toUpperCase(), 
               valueColor: _getSeverityColor(alert.severity)),
             _buildDetailItem('Timestamp', 
               DateFormat.yMMMd().add_jms().format(alert.timestamp)),

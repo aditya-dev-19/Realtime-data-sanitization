@@ -133,7 +133,7 @@ class _MyAppContentState extends State<MyAppContent> {
     _screens = [
       const DashboardScreen(),
       const ThreatDetectionScreen(),
-      const AlertsScreen(),
+      const AlertsPage(),
       const SettingsScreen(),
     ];
     

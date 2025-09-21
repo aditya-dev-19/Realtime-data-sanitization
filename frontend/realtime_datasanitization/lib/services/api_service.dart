@@ -7,7 +7,7 @@ import '../models/alert.dart';
 
 class ApiService {
   // Base URL for the API with version prefix
-  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app/';
+  static const String _baseUrl = 'https://cybersecurity-api-service-44185828496.us-central1.run.app';
   
   // Headers for API requests
   final Map<String, String> _headers = {
@@ -32,50 +32,48 @@ class ApiService {
 
   // Auth
   Future<Map<String, dynamic>> login(String email, String password) async {
-    try {
-      final url = '$_baseUrl/token'; // Correct endpoint
-      debugPrint('Attempting login to: $url');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json', // 👈 CHANGED: Header is now JSON
-        },
-        body: jsonEncode({ // 👈 CHANGED: Body is now a JSON object
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      debugPrint('Login response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
-        if (responseData is! Map<String, dynamic>) {
-          throw Exception('Invalid response format from server. Response: ${response.body}');
-        }
-        if (responseData['access_token'] == null) {
-          throw Exception('No access token in response. Response: ${response.body}');
-        }
-        return responseData;
-      } else {
-        // Handle OAuth2-style errors which use "username" in the detail message
-        if (response.body.contains("Incorrect username or password")) {
-            throw Exception("Incorrect email or password");
-        }
-        final error = jsonDecode(response.body);
-        throw Exception(error['detail'] ?? 'Failed to login: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Error in login: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> register(String email, String password) async { // 👈 CHANGED: Removed username
   try {
-    final url = '$_baseUrl/register'; // Correct endpoint
+    final url = '${_baseUrl}/token'; // Note: no leading slash
+    debugPrint('Attempting login to: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    debugPrint('Login response status: ${response.statusCode}');
+    debugPrint('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+      if (responseData is! Map<String, dynamic>) {
+        throw Exception('Invalid response format from server');
+      }
+      if (responseData['access_token'] == null) {
+        throw Exception('No access token in response');
+      }
+      return responseData;
+    } else {
+      final error = jsonDecode(response.body);
+      final errorMessage = error['detail'] ?? 'Login failed';
+      throw Exception(errorMessage);
+    }
+  } catch (e) {
+    debugPrint('Error in login: $e');
+    rethrow;
+  }
+}
+
+Future<void> register(String email, String password) async {
+  try {
+    final url = '${_baseUrl}/register'; // Note: no leading slash
     debugPrint('Attempting registration at: $url');
     
     final response = await http.post(
@@ -84,7 +82,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: jsonEncode({ // 👈 CHANGED: Removed username from the body
+      body: jsonEncode({
         'email': email,
         'password': password,
       }),
@@ -94,14 +92,15 @@ class ApiService {
     debugPrint('Response body: ${response.body}');
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to register: ${response.statusCode} - ${response.body}');
+      final error = jsonDecode(response.body);
+      final errorMessage = error['detail'] ?? 'Registration failed';
+      throw Exception(errorMessage);
     }
   } catch (e) {
     debugPrint('Error in register: $e');
     rethrow;
   }
 }
-
 
   // Alerts
   Future<List<dynamic>> getAlerts({int limit = 100, String? status, String? severity, int offset = 0}) async {

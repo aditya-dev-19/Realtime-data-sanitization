@@ -455,7 +455,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _formatTimeAgo(alert.createdAt),
+                    _formatTimeAgo(alert.timestamp),
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 12,
