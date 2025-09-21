@@ -24,3 +24,5 @@ downloaded_models/
 
 # Other environment files
 *.ipynb_checkpoints
+
+backend/realtime-data-sanitization-427f286d3e4f.json
