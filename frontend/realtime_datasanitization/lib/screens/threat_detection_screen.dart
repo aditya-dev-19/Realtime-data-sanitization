@@ -215,7 +215,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
 
   Widget _buildScanResult(ScanResult result) {
     final bool isThreat = result.isThreat;
-    
+    final analysis = result.rawAnalysis ?? {};
+    final analyses = analysis['analyses'] ?? {};
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -230,6 +232,7 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Overall Risk Section
             Row(
               children: [
                 Icon(
@@ -239,19 +242,55 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    isThreat ? 'Potential Threat Detected!' : 'No Threats Found',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isThreat ? 'Potential Threat Detected!' : 'No Threats Found',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (analysis['overall_risk_score'] != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Risk Level: ${_getRiskLevel(analysis['overall_risk_score'])}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isThreat ? Colors.red : Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
+            // Risk Score Bar
+            if (analysis['overall_risk_score'] != null) ...[
+              LinearProgressIndicator(
+                value: analysis['overall_risk_score'],
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _getRiskColor(analysis['overall_risk_score'])
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Risk Score: ${analysis['overall_risk_score'].toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: _getRiskColor(analysis['overall_risk_score']),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             if (isThreat) ...[
               const Text(
                 'Threat Details:',
@@ -263,7 +302,32 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
               const SizedBox(height: 8),
               Text(result.threatDetails ?? 'No additional details available'),
               const SizedBox(height: 16),
-              
+            ],
+
+            // Detailed Analysis Sections
+            _buildAnalysisSection(
+              title: 'Sensitive Data Analysis',
+              analysis: analyses['sensitive_data'] ?? {},
+            ),
+
+            _buildAnalysisSection(
+              title: 'Phishing Detection',
+              analysis: analyses['phishing'] ?? {},
+            ),
+
+            _buildAnalysisSection(
+              title: 'Code Injection Analysis',
+              analysis: analyses['code_injection'] ?? {},
+            ),
+
+            _buildAnalysisSection(
+              title: 'Data Quality Assessment',
+              analysis: analyses['data_quality'] ?? {},
+            ),
+
+            // Recommended Actions
+            if (result.recommendedActions.isNotEmpty) ...[
+              const SizedBox(height: 16),
               const Text(
                 'Recommended Actions:',
                 style: TextStyle(
@@ -272,31 +336,21 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...(result.recommendedActions ?? ['No specific actions recommended'])
-                  .map((action) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.arrow_right, size: 20),
-                            const SizedBox(width: 4),
-                            Expanded(child: Text(action)),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-            ] else ...[
-              const Text(
-                'The content appears to be safe.',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              ...result.recommendedActions.map((action) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.arrow_right, size: 20),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(action)),
+                      ],
+                    ),
+                  )).toList(),
             ],
-            
+
             const SizedBox(height: 16),
-            
+
             // Additional metadata
             if (result.timestamp != null) ...[
               const Divider(),
@@ -314,7 +368,63 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     );
   }
   
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  Widget _buildAnalysisSection({required String title, required Map<String, dynamic> analysis}) {
+    return ExpansionTile(
+      title: Text(
+        title,
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: _buildAnalysisDetails(analysis),
+        ),
+      ],
+    );
   }
-}
+
+  Widget _buildAnalysisDetails(Map<String, dynamic> analysis) {
+    if (analysis.isEmpty) {
+      return const Text('No data available');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: analysis.entries.map((entry) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${entry.key}: ',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Expanded(
+                child: Text(
+                  entry.value.toString(),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _getRiskLevel(double score) {
+    if (score >= 0.8) return 'Critical';
+    if (score >= 0.6) return 'High';
+    if (score >= 0.4) return 'Medium';
+    if (score >= 0.2) return 'Low';
+    return 'Info';
+  }
+
+  Color _getRiskColor(double score) {
+    if (score >= 0.8) return Colors.red;
+    if (score >= 0.6) return Colors.orange;
+    if (score >= 0.4) return Colors.amber;
+    if (score >= 0.2) return Colors.lightBlue;
+    return Colors.green;
+  }

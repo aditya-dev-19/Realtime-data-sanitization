@@ -1,28 +1,26 @@
 import 'package:flutter/foundation.dart';
 
 class ScanResult {
-  final String id;
+  ffinal String id;
   final bool isThreat;
   final String? threatType;
   final String? threatDetails;
-  final double? threatScore;
-  final DateTime timestamp;
-  final Map<String, dynamic>? metadata;
-  final List<String>? recommendedActions;
-  final String? scannedContentPreview;
-  final String? scanType; // 'text', 'file', 'url', etc.
+  final double threatScore;
+  final String scannedContentPreview;
+  final String scanType;
+  final List<String> recommendedActions;
+  final Map<String, dynamic>? rawAnalysis;
 
   ScanResult({
     required this.id,
     required this.isThreat,
     this.threatType,
     this.threatDetails,
-    this.threatScore,
-    DateTime? timestamp,
-    this.metadata,
-    this.recommendedActions,
-    this.scannedContentPreview,
-    this.scanType = 'text',
+    required this.threatScore,
+    required this.scannedContentPreview,
+    required this.scanType,
+    this.recommendedActions = const [],
+    this.rawAnalysis,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory ScanResult.fromJson(Map<String, dynamic> json) {

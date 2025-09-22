@@ -4,12 +4,12 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 from google.cloud import storage
-
+from datetime import datetime  # Add this import at the top of the file
 # --- Local Imports ---
 from .orchestrator import CybersecurityOrchestrator
 from .routers import users, alerts
 from .firebase_admin import db
-from . import alerting  # 👈 [MODIFIED] Import the new centralized alerting module
+from . import alerting  # Import the new centralized alerting module
 
 # --- Global Orchestrator ---
 orchestrator: CybersecurityOrchestrator = None
@@ -167,29 +167,87 @@ async def analyze_file(file: UploadFile = File(...), orch: CybersecurityOrchestr
             os.remove(temp_file_path)
 
 @app.post("/detect-phishing", tags=["Threat Detection"])
-async def detect_phishing(data: TextData, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+async def detect_phishing_endpoint(
+    data: TextData, 
+    orch: CybersecurityOrchestrator = Depends(get_orchestrator)
+) -> Dict[str, Any]:
+    """
+    Endpoint to detect phishing attempts in the provided text.
+    """
     try:
         result = orch.detect_phishing(data.text)
-        # [MODIFIED] If phishing is detected, create a standardized alert
-        if result.get("is_phishing"):
-            alert = alerting.format_phishing_alert(data.text, result)
+        
+        # Create an alert if phishing is detected
+        if result.get("is_phishing", False):
+            alert = {
+                "alert_type": "phishing_attempt",
+                "severity": "high",
+                "timestamp": datetime.utcnow().isoformat(),
+                "details": {
+                    "suspicious_urls": result.get("suspicious_urls", []),
+                    "confidence": result.get("confidence", 0),
+                    "indicators": [
+                        "suspicious_urls" if result.get("suspicious_urls") else None,
+                        "urgency_keywords" if result.get("contains_urgency_keywords") else None,
+                        "suspicious_sender" if result.get("suspicious_sender") else None
+                    ]
+                },
+                "raw_text": data.text[:500]  # Store first 500 chars for reference
+            }
             await alerting.create_alert(alert)
-        return {"analysis_type": "Phishing Detection", "result": result}
+            
+        return {
+            "analysis_type": "Phishing Detection",
+            "timestamp": datetime.utcnow().isoformat(),
+            "result": result
+        }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in phishing detection: {str(e)}"
+        )
 
 @app.post("/detect-code-injection", tags=["Threat Detection"])
-async def detect_code_injection(data: TextData, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+async def detect_code_injection_endpoint(
+    data: TextData, 
+    orch: CybersecurityOrchestrator = Depends(get_orchestrator)
+) -> Dict[str, Any]:
+    """
+    Endpoint to detect code injection attempts in the provided text.
+    """
     try:
         result = orch.detect_code_injection(data.text)
-        # [MODIFIED] If injection is detected, create a standardized alert
-        if result.get("is_injection"):
-            alert = alerting.format_code_injection_alert(data.text, result)
+        
+        # Create an alert if injection is detected
+        if result.get("is_injection", False):
+            alert = {
+                "alert_type": "code_injection_attempt",
+                "severity": "critical",
+                "timestamp": datetime.utcnow().isoformat(),
+                "details": {
+                    "detected_patterns": result.get("detected_patterns", []),
+                    "confidence": result.get("confidence", 0),
+                    "severity_levels": list(set(
+                        pattern.get("severity", "medium") 
+                        for pattern in result.get("detected_patterns", [])
+                    ))
+                },
+                "raw_text": data.text[:500]  # Store first 500 chars for reference
+            }
             await alerting.create_alert(alert)
-        return {"analysis_type": "Code Injection Detection", "result": result}
+            
+        return {
+            "analysis_type": "Code Injection Detection",
+            "timestamp": datetime.utcnow().isoformat(),
+            "result": result
+        }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in code injection detection: {str(e)}"
+        )
 @app.post("/analyze-system-calls", tags=["Threat Detection"])
 async def analyze_system_calls(data: SystemCalls, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
     try:
@@ -238,16 +296,63 @@ async def assess_json_quality(payload: JsonData, orch: CybersecurityOrchestrator
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"JSON quality assessment failed: {e}")
 
-@app.post("/comprehensive-analysis", tags=["Enhanced Analysis"])
-async def comprehensive_analysis(data: TextData, orch: CybersecurityOrchestrator = Depends(get_orchestrator)):
+# Add these endpoints to your existing comprehensive analysis
+@app.post("/comprehensive-analysis", tags=["Analysis"])
+async def comprehensive_analysis(
+    data: TextData, 
+    orch: CybersecurityOrchestrator = Depends(get_orchestrator)
+) -> Dict[str, Any]:
+    """
+    Performs comprehensive security analysis on the input text.
+    """
     try:
-        # Note: The comprehensive analysis function in the orchestrator should be
-        # responsible for calling the individual alert formatters itself,
-        # or this endpoint should be updated to do so based on the detailed results.
-        return orch.comprehensive_analysis(data.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Comprehensive analysis failed: {e}")
+        # Run all analyses in parallel
+        sensitive_result = orch.classify_sensitive_data(data.text)
+        quality_result = orch.assess_data_quality(data.text)
+        phishing_result = await detect_phishing_endpoint(data, orch)
+        code_injection_result = await detect_code_injection_endpoint(data, orch)
         
+        # Calculate overall risk score (simple average for demonstration)
+        risk_scores = [
+            sensitive_result.get("result", {}).get("confidence", 0),
+            quality_result.get("quality_score", 1.0),
+            phishing_result.get("result", {}).get("confidence", 0),
+            code_injection_result.get("result", {}).get("confidence", 0)
+        ]
+        overall_risk = sum(risk_scores) / len(risk_scores)
+        
+        return {
+            "analysis_type": "Comprehensive Security Analysis",
+            "timestamp": datetime.utcnow().isoformat(),
+            "overall_risk_score": overall_risk,
+            "risk_level": _get_risk_level(overall_risk),
+            "analyses": {
+                "sensitive_data": sensitive_result,
+                "data_quality": quality_result,
+                "phishing": phishing_result.get("result", {}),
+                "code_injection": code_injection_result.get("result", {})
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in comprehensive analysis: {str(e)}"
+        )
+
+def _get_risk_level(score: float) -> str:
+    """Convert risk score to human-readable level"""
+    if score >= 0.8:
+        return "critical"
+    elif score >= 0.6:
+        return "high"
+    elif score >= 0.4:
+        return "medium"
+    elif score >= 0.2:
+        return "low"
+    return "info"
+
+
 @app.get("/health", tags=["System Monitoring"])
 async def health_check():
     db_status = "ok"

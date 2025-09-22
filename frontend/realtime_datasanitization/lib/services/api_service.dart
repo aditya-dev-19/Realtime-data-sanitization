@@ -102,6 +102,43 @@ Future<void> register(String email, String password) async {
   }
 }
 
+// Phishing detection
+Future<Map<String, dynamic>> detectPhishing(String text) async {
+  return _makeApiRequest('/detect-phishing', {'text': text});
+}
+
+// Code injection detection
+Future<Map<String, dynamic>> detectCodeInjection(String text) async {
+  return _makeApiRequest('/detect-code-injection', {'text': text});
+}
+
+// Comprehensive analysis
+Future<Map<String, dynamic>> runComprehensiveAnalysis(String text) async {
+  return _makeApiRequest('/comprehensive-analysis', {'text': text});
+}
+
+// Helper method for API requests
+Future<Map<String, dynamic>> _makeApiRequest(
+  String endpoint, 
+  Map<String, dynamic> data
+) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$_baseUrl$endpoint'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('API request failed: ${response.statusCode}');
+    }
+  } catch (e) {
+    debugPrint('API Error: $e');
+    rethrow;
+  }
+}
   // Alerts
   Future<List<dynamic>> getAlerts({int limit = 100, String? status, String? severity, int offset = 0}) async {
     try {
