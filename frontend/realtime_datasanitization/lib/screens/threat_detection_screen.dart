@@ -428,3 +428,8 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     if (score >= 0.2) return Colors.lightBlue;
     return Colors.green;
   }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+}

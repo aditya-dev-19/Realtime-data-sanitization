@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class ScanResult {
-  ffinal String id;
+  final String id;
   final bool isThreat;
   final String? threatType;
   final String? threatDetails;
@@ -10,6 +10,8 @@ class ScanResult {
   final String scanType;
   final List<String> recommendedActions;
   final Map<String, dynamic>? rawAnalysis;
+  final DateTime timestamp;
+  final Map<String, dynamic>? metadata;
 
   ScanResult({
     required this.id,
@@ -21,6 +23,8 @@ class ScanResult {
     required this.scanType,
     this.recommendedActions = const [],
     this.rawAnalysis,
+    this.metadata,
+    DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory ScanResult.fromJson(Map<String, dynamic> json) {
@@ -29,18 +33,18 @@ class ScanResult {
       isThreat: json['isThreat'] ?? false,
       threatType: json['threatType'],
       threatDetails: json['threatDetails'],
-      threatScore: json['threatScore']?.toDouble(),
-      timestamp: json['timestamp'] != null 
-          ? DateTime.parse(json['timestamp']) 
-          : DateTime.now(),
-      metadata: json['metadata'] != null 
-          ? Map<String, dynamic>.from(json['metadata']) 
+      threatScore: (json['threatScore'] ?? 0).toDouble(),
+      scannedContentPreview: json['scannedContentPreview'] ?? '',
+      scanType: json['scanType'] ?? 'text',
+      metadata: json['metadata'] != null
+          ? Map<String, dynamic>.from(json['metadata'])
           : null,
       recommendedActions: json['recommendedActions'] != null
           ? List<String>.from(json['recommendedActions'])
-          : null,
-      scannedContentPreview: json['scannedContentPreview'],
-      scanType: json['scanType'] ?? 'text',
+          : [],
+      timestamp: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'])
+          : DateTime.now(),
     );
   }
 

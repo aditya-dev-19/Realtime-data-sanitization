@@ -164,7 +164,7 @@ class ThreatProvider with ChangeNotifier {
         threatDetails: isThreat 
             ? (isExecutable 
                 ? 'Executable files can contain malicious code' 
-                : 'Document is unusually large and may contain embedded threats')
+                : 'Document is unusually large and may contain embedded threats. Please review the file contents carefully before opening.')
             : null,
         threatScore: isThreat ? (isExecutable ? 0.95 : 0.7) : 0.1,
         scannedContentPreview: 'File: ${file.name} (${_formatFileSize(file.size)})',
@@ -172,11 +172,6 @@ class ThreatProvider with ChangeNotifier {
         recommendedActions: isThreat 
             ? ['Do not open the file', 'Scan with antivirus', 'Delete if not needed'] 
             : ['File appears to be safe'],
-        metadata: {
-          'filename': file.name,
-          'size': file.size,
-          'extension': fileExt,
-        },
       );
       
       _lastScanResult = result;
