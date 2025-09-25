@@ -42,5 +42,12 @@ python-jose[cryptography]
 # firebase
 firebase-admin
 google-cloud-storage
+google-cloud-kms
+google-cloud-firestore
 
 passlib[bcrypt] 
+google-cloud-storage>=2.10.0
+google-cloud-kms>=2.9.0
+google-cloud-firestore>=2.11.0
+cryptography>=41.0.0
+python-dotenv>=1.0.0

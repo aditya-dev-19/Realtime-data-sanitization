@@ -5,14 +5,20 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 from google.cloud import storage
 from datetime import datetime  # Add this import at the top of the file
+from dotenv import load_dotenv
 # --- Local Imports ---
 from .orchestrator import CybersecurityOrchestrator
 from .routers import users, alerts
 from .firebase_admin import db
 from . import alerting  # Import the new centralized alerting module
-
+from .storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc
+from fastapi.responses import JSONResponse, Response
 # --- Global Orchestrator ---
 orchestrator: CybersecurityOrchestrator = None
+
+# Load environment variables from the .env file
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(project_root, '.env'))
 
 # --- GCS Model Download Function ---
 def download_models_from_gcs(bucket_name: str, destination_folder: str = "downloaded_models"):
@@ -454,6 +460,51 @@ def get_model_stats(orch: CybersecurityOrchestrator = Depends(get_orchestrator))
         return orch.get_model_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get model stats: {e}")
+
+@app.post("/encrypt-upload")
+async def upload_and_encrypt_file(file: UploadFile = File(...), sensitivity_score: float = 0.5):
+    """
+    Encrypts an uploaded file based on its sensitivity and stores it in cloud storage.
+    """
+    try:
+        file_bytes = await file.read()
+        
+        # Call the encryption and upload function
+        result = encrypt_and_upload_file(
+            file_bytes=file_bytes,
+            original_filename=file.filename,
+            sensitivity=sensitivity_score
+        )
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"File '{file.filename}' encrypted and uploaded successfully.",
+            "data": {
+                "firestore_doc_id": result["firestore_doc_id"],
+                "gcs_object_name": result["object_name"],
+                "encryption_type": result["cipher"]
+            }
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to encrypt and upload file: {str(e)}")
+
+@app.get("/download-decrypt")
+async def download_and_decrypt_file(firestore_doc_id: str):
+    """
+    Retrieves and decrypts an encrypted file from cloud storage using its Firestore document ID.
+    """
+    try:
+        plaintext, metadata = download_and_decrypt_file_by_doc(firestore_doc_id)
+        
+        return Response(content=plaintext, media_type="application/octet-stream", headers={
+            "Content-Disposition": f'attachment; filename="{metadata["original_filename"]}"'
+        })
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download and decrypt file: {str(e)}")
 
 # --- Include API Routers ---
 app.include_router(alerts.router)
