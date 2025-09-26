@@ -27,22 +27,33 @@ async def create_alert(alert_data: AlertCreate):
 def format_phishing_alert(text: str, result: Dict[str, Any]) -> AlertCreate:
     """Formats an alert for a phishing detection event."""
     confidence_score = result.get('confidence', 0) * 100
+
+    # Handle rule-based results that might have different structure
+    details = {
+        "type": "phishing",
+        "text_analyzed": text[:500],  # Truncate for brevity
+        "confidence": result.get('confidence'),
+        "recommendation": "Do not click any links or provide personal information. Delete the message immediately."
+    }
+
+    # Add rule-based specific details if available
+    if 'details' in result:
+        details.update(result['details'])
+    if 'indicators_found' in result.get('details', {}):
+        details["indicators"] = result['details']['indicators_found']
+
     return AlertCreate(
         title="Phishing Attempt Detected",
         description=f"A potential phishing link was detected with {confidence_score:.2f}% confidence.",
         severity="High",
         source="Phishing Detection Model",
-        details={
-            "type": "phishing",
-            "text_analyzed": text[:500],  # Truncate for brevity
-            "confidence": result.get('confidence'),
-            "recommendation": "Do not click any links or provide personal information. Delete the message immediately."
-        }
+        details=details
     )
 
 def format_code_injection_alert(text: str, result: Dict[str, Any]) -> AlertCreate:
     """Formats an alert for a code injection event."""
-    score = result.get('score', 0)
+    # Handle both ML model results (score) and rule-based results (confidence)
+    score = result.get('score', result.get('confidence', 0))
     return AlertCreate(
         title="Code Injection Vulnerability",
         description=f"A potential code injection pattern was found with a threat score of {score:.2f}.",
@@ -52,6 +63,8 @@ def format_code_injection_alert(text: str, result: Dict[str, Any]) -> AlertCreat
             "type": "code_injection",
             "vulnerable_string": text,
             "score": score,
+            "patterns_found": result.get('patterns_found', []),
+            "severity": result.get('severity', 'unknown'),
             "recommendation": "Ensure all user inputs are rigorously sanitized. Use parameterized queries or prepared statements for database interactions."
         }
     )

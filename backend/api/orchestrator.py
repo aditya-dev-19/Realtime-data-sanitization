@@ -363,10 +363,16 @@ class CybersecurityOrchestrator:
         return status
     
     def detect_phishing(self, text: str):
-        """Analyzes text to detect phishing attempts using a transformer model."""
+        """Analyzes text to detect phishing attempts using a transformer model with rule-based fallback."""
         if not self.phishing_model or not self.phishing_tokenizer:
-            return {"error": "Phishing detection model not available", "status": "Model unavailable"}
-        
+            # Fallback to rule-based detection
+            try:
+                from rule_based_phishing import RuleBasedPhishingDetector
+                detector = RuleBasedPhishingDetector()
+                return detector.analyze(text)
+            except Exception as e:
+                return {"error": f"Phishing detection model not available and fallback failed: {str(e)}", "status": "Analysis failed"}
+
         try:
             inputs = self.phishing_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -377,15 +383,91 @@ class CybersecurityOrchestrator:
                 prediction = torch.argmax(probabilities, dim=-1).item()
             confidence = probabilities[0, prediction].item()
             label = self.phishing_model.config.id2label[prediction]
+
+            # If ML model returns "Safe" with very high confidence for obvious phishing content,
+            # use rule-based detection as a fallback
+            if label == "Safe" and confidence > 0.95:
+                try:
+                    from rule_based_phishing import RuleBasedPhishingDetector
+                    detector = RuleBasedPhishingDetector()
+                    rule_result = detector.analyze(text)
+
+                    # If rule-based detects phishing with reasonable confidence, use it instead
+                    if rule_result["status"] == "Phishing" and rule_result["confidence"] > 0.3:
+                        return {
+                            "status": "Phishing",
+                            "confidence": rule_result["confidence"],
+                            "details": {
+                                "ml_prediction": "Safe",
+                                "ml_confidence": confidence,
+                                "rule_based_prediction": "Phishing",
+                                "rule_based_confidence": rule_result["confidence"],
+                                "indicators": rule_result["details"]["indicators_found"],
+                                "fallback_used": True
+                            }
+                        }
+                except Exception as e:
+                    # If rule-based fails, continue with ML result but add warning
+                    return {
+                        "status": label,
+                        "confidence": confidence,
+                        "warning": f"ML model returned high-confidence 'Safe' result. Rule-based fallback failed: {str(e)}"
+                    }
+
+            # If ML model returns "Phishing" with very high confidence for obviously clean text,
+            # use rule-based detection as a fallback
+            if label == "Phishing" and confidence > 0.95:
+                try:
+                    from rule_based_phishing import RuleBasedPhishingDetector
+                    detector = RuleBasedPhishingDetector()
+                    rule_result = detector.analyze(text)
+
+                    # If rule-based detects safe content with high confidence, use it instead
+                    if rule_result["status"] == "Safe" and rule_result["confidence"] < 0.1:
+                        return {
+                            "status": "Safe",
+                            "confidence": 0.0,
+                            "details": {
+                                "ml_prediction": "Phishing",
+                                "ml_confidence": confidence,
+                                "rule_based_prediction": "Safe",
+                                "rule_based_confidence": rule_result["confidence"],
+                                "fallback_used": True,
+                                "reason": "ML model incorrectly flagged clean text as phishing"
+                            }
+                        }
+                except Exception as e:
+                    # If rule-based fails, continue with ML result but add warning
+                    return {
+                        "status": label,
+                        "confidence": confidence,
+                        "warning": f"ML model returned high-confidence 'Phishing' result. Rule-based fallback failed: {str(e)}"
+                    }
+
             return {"status": label, "confidence": confidence}
         except Exception as e:
-            return {"error": f"Phishing detection failed: {str(e)}", "status": "Analysis failed"}
+            # Fallback to rule-based detection on any error
+            try:
+                from rule_based_phishing import RuleBasedPhishingDetector
+                detector = RuleBasedPhishingDetector()
+                result = detector.analyze(text)
+                result["fallback_used"] = True
+                result["original_error"] = str(e)
+                return result
+            except Exception as fallback_e:
+                return {"error": f"Phishing detection failed: {str(e)}. Fallback also failed: {str(fallback_e)}", "status": "Analysis failed"}
 
     def detect_code_injection(self, text: str):
-        """Analyzes text to detect code injection attempts using a transformer model."""
+        """Analyzes text to detect code injection attempts using a transformer model with rule-based fallback."""
         if not self.code_injection_model or not self.code_injection_tokenizer:
-            return {"error": "Code injection detection model not available", "status": "Model unavailable"}
-        
+            # Fallback to rule-based detection
+            try:
+                from rule_based_injection import RuleBasedCodeInjectionDetector
+                detector = RuleBasedCodeInjectionDetector()
+                return detector.analyze(text)
+            except Exception as e:
+                return {"error": f"Code injection detection model not available and fallback failed: {str(e)}", "status": "Analysis failed"}
+
         try:
             inputs = self.code_injection_tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
@@ -396,9 +478,50 @@ class CybersecurityOrchestrator:
                 prediction = torch.argmax(probabilities, dim=-1).item()
             confidence = probabilities[0, prediction].item()
             label = self.code_injection_model.config.id2label[prediction]
+
+            # If ML model returns "Safe" with very high confidence for obvious injection content,
+            # use rule-based detection as a fallback
+            if label == "Safe" and confidence > 0.95:
+                try:
+                    from rule_based_injection import RuleBasedCodeInjectionDetector
+                    detector = RuleBasedCodeInjectionDetector()
+                    rule_result = detector.analyze(text)
+
+                    # If rule-based detects injection with reasonable confidence, use it instead
+                    if rule_result["status"] == "Injection" and rule_result["confidence"] > 0.3:
+                        return {
+                            "status": "Injection",
+                            "confidence": rule_result["confidence"],
+                            "details": {
+                                "ml_prediction": "Safe",
+                                "ml_confidence": confidence,
+                                "rule_based_prediction": "Injection",
+                                "rule_based_confidence": rule_result["confidence"],
+                                "patterns": rule_result["details"]["patterns_found"],
+                                "severity": rule_result["details"]["severity"],
+                                "fallback_used": True
+                            }
+                        }
+                except Exception as e:
+                    # If rule-based fails, continue with ML result but add warning
+                    return {
+                        "status": label,
+                        "confidence": confidence,
+                        "warning": f"ML model returned high-confidence 'Safe' result. Rule-based fallback failed: {str(e)}"
+                    }
+
             return {"status": label, "confidence": confidence}
         except Exception as e:
-            return {"error": f"Code injection detection failed: {str(e)}", "status": "Analysis failed"}
+            # Fallback to rule-based detection on any error
+            try:
+                from rule_based_injection import RuleBasedCodeInjectionDetector
+                detector = RuleBasedCodeInjectionDetector()
+                result = detector.analyze(text)
+                result["fallback_used"] = True
+                result["original_error"] = str(e)
+                return result
+            except Exception as fallback_e:
+                return {"error": f"Code injection detection failed: {str(e)}. Fallback also failed: {str(fallback_e)}", "status": "Analysis failed"}
 
     def analyze_system_calls(self, call_sequence):
         """Analyzes system calls - alias for analyze_dynamic_behavior for backward compatibility."""

@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 from google.cloud import storage
@@ -305,90 +305,201 @@ async def assess_json_quality(payload: JsonData, orch: CybersecurityOrchestrator
 # Add these endpoints to your existing comprehensive analysis
 @app.post("/comprehensive-analysis", tags=["Analysis"])
 async def comprehensive_analysis(
-    data: TextData, 
+    text: str = Form(None),
+    file: UploadFile = File(None),
     orch: CybersecurityOrchestrator = Depends(get_orchestrator)
 ) -> Dict[str, Any]:
     """
-    Performs comprehensive security analysis on the input text.
+    Performs comprehensive security analysis on the input text or uploaded file.
+    Uses all available model artifacts for thorough analysis.
     """
     try:
-        # Run all analyses in parallel
-        sensitive_result = orch.classify_sensitive_data(data.text)
-        quality_result = orch.assess_data_quality(data.text)
-        phishing_result = await detect_phishing_endpoint(data, orch)
-        code_injection_result = await detect_code_injection_endpoint(data, orch)
-        
-        # Calculate overall risk score (weighted average with intelligent thresholds)
-        risk_scores = [
-            sensitive_result.get("result", {}).get("confidence", 0),
-            quality_result.get("quality_score", 1.0),
-            phishing_result.get("result", {}).get("confidence", 0),
-            code_injection_result.get("result", {}).get("confidence", 0)
-        ]
+        # Handle file upload
+        if file and file.filename:
+            file_content = await file.read()
+            analysis_text = file_content.decode('utf-8', errors='ignore')
+            file_metadata = {
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "size": len(file_content)
+            }
+        elif text:
+            analysis_text = text
+            file_metadata = None
+        else:
+            raise HTTPException(status_code=400, detail="Either text or file must be provided")
 
-        # Apply intelligent weighting based on detection reliability
-        weights = [0.3, 0.1, 0.3, 0.3]  # Sensitive data, Quality, Phishing, Code Injection
+        print(f"Analyzing content of length: {len(analysis_text)} characters")
 
-        # Additional intelligent analysis to detect obvious false positives
-        false_positive_indicators = {
-            'phishing': [
-                len(data.text.split()) < 15,  # Short messages are unlikely to be phishing
-                'name' in data.text.lower() and 'my' in data.text.lower(),  # Personal introductions
-                not any(word in data.text.lower() for word in ['click', 'here', 'urgent', 'account', 'verify', 'login', 'http']),
-            ],
-            'code_injection': [
-                not any(char in data.text for char in ['<', '>', ';', '$', '|', '&', '(', ')', '{', '}', '[', ']']),
-                len(data.text.split()) < 20,  # Short text can't really contain dangerous code
-                all(word.isalpha() or word in ['my', 'is', 'name'] for word in data.text.lower().split() if len(word) > 1),
-            ]
-        }
+        # Run all analyses using model artifacts
+        results = {}
 
-        # More precise false positive detection
-        words = data.text.lower().split()
-        is_personal_message = (
-            'name' in data.text.lower() and
-            'my' in data.text.lower() and
-            len(words) < 15 and
-            not any(word in words for word in ['urgent', 'verify', 'account', 'login', 'password', 'bank'])
-        )
+        # 1. Sensitive Data Analysis (using data classification models)
+        try:
+            sensitive_result = orch.classify_sensitive_data(analysis_text)
+            results["sensitive_data"] = sensitive_result
+            print(f"Sensitive data analysis completed: {sensitive_result.get('classification', 'Unknown')}")
+        except Exception as e:
+            results["sensitive_data"] = {
+                "error": f"Sensitive data analysis failed: {str(e)}",
+                "classification": "ERROR"
+            }
+            print(f"Sensitive data analysis error: {e}")
 
-        is_normal_text = (
-            len(words) < 20 and
-            all(word.isalpha() or word in ['my', 'is', 'name', 'the', 'and', 'or', 'but'] for word in words if len(word) > 1)
-        )
+        # 2. Data Quality Assessment (using quality assessment models)
+        try:
+            quality_result = orch.assess_data_quality(analysis_text)
+            results["data_quality"] = quality_result
+            print(f"Data quality analysis completed: {quality_result.get('quality_score', 0)}")
+        except Exception as e:
+            results["data_quality"] = {
+                "error": f"Data quality analysis failed: {str(e)}",
+                "quality_score": 0.0
+            }
+            print(f"Data quality analysis error: {e}")
 
-        # Override ML results only for obvious personal messages or normal text
-        if is_personal_message or (is_normal_text and len(words) < 10):
-            phishing_result["result"] = {"status": "Safe", "confidence": 0.05}
+        # 3. Phishing Detection (using transformer models)
+        try:
+            phishing_result = orch.detect_phishing(analysis_text)
+            results["phishing"] = phishing_result
+            print(f"Phishing analysis completed: {phishing_result.get('status', 'Unknown')}")
+        except Exception as e:
+            results["phishing"] = {
+                "error": f"Phishing detection failed: {str(e)}",
+                "status": "ERROR"
+            }
+            print(f"Phishing analysis error: {e}")
 
-        if is_normal_text and len(words) < 15:
-            code_injection_result["result"] = {"status": "Safe", "confidence": 0.05}
+        # 4. Code Injection Detection (using transformer models)
+        try:
+            code_injection_result = orch.detect_code_injection(analysis_text)
+            results["code_injection"] = code_injection_result
+            print(f"Code injection analysis completed: {code_injection_result.get('status', 'Unknown')}")
+        except Exception as e:
+            results["code_injection"] = {
+                "error": f"Code injection detection failed: {str(e)}",
+                "status": "ERROR"
+            }
+            print(f"Code injection analysis error: {e}")
 
-        # Recalculate with adjusted confidences
-        adjusted_risk_scores = [
-            sensitive_result.get("result", {}).get("confidence", 0),
-            quality_result.get("quality_score", 1.0),
-            phishing_result.get("result", {}).get("confidence", 0),
-            code_injection_result.get("result", {}).get("confidence", 0)
-        ]
+        # 5. File-specific analysis (if file was uploaded)
+        if file_metadata:
+            try:
+                import hashlib
+                file_hash = hashlib.sha256(file_content).hexdigest()
+                results["file_analysis"] = {
+                    "file_hash": file_hash,
+                    "file_size": file_metadata["size"],
+                    "content_type": file_metadata["content_type"],
+                    "filename": file_metadata["filename"]
+                }
+                print(f"File analysis completed: {file_hash[:16]}...")
+            except Exception as e:
+                results["file_analysis"] = {
+                    "error": f"File analysis failed: {str(e)}"
+                }
+                print(f"File analysis error: {e}")
 
-        overall_risk = sum(score * weight for score, weight in zip(adjusted_risk_scores, weights))
-        overall_risk = overall_risk / sum(weights) if sum(weights) > 0 else 0
-        
+        # Calculate overall risk score
+        risk_scores = []
+        risk_weights = []
+
+        # Sensitive data risk (weight: 0.4)
+        if "error" not in results["sensitive_data"]:
+            sensitive_conf = results["sensitive_data"].get("result", {}).get("confidence", 0)
+            risk_scores.append(sensitive_conf)
+            risk_weights.append(0.4)
+
+        # Data quality risk (weight: 0.1)
+        if "error" not in results["data_quality"]:
+            quality_score = results["data_quality"].get("quality_score", 1.0)
+            # Lower quality = higher risk
+            quality_risk = 1.0 - quality_score
+            risk_scores.append(quality_risk)
+            risk_weights.append(0.1)
+
+        # Phishing risk (weight: 0.3)
+        if "error" not in results["phishing"]:
+            phishing_status = results["phishing"].get("status", "")
+            phishing_conf = results["phishing"].get("confidence", 0)
+            # If phishing is detected, use confidence as risk; if safe, risk is 0
+            phishing_risk = phishing_conf if phishing_status == "Phishing" else 0.0
+            risk_scores.append(phishing_risk)
+            risk_weights.append(0.3)
+
+        # Code injection risk (weight: 0.2)
+        if "error" not in results["code_injection"]:
+            injection_status = results["code_injection"].get("status", "")
+            injection_conf = results["code_injection"].get("confidence", 0)
+            # If injection is detected, use confidence as risk; if safe, risk is 0
+            injection_risk = injection_conf if injection_status == "Injection" else 0.0
+            risk_scores.append(injection_risk)
+            risk_weights.append(0.2)
+
+        # Calculate weighted average
+        if risk_scores and risk_weights:
+            overall_risk = sum(score * weight for score, weight in zip(risk_scores, risk_weights))
+            overall_risk = overall_risk / sum(risk_weights)
+        else:
+            overall_risk = 0.0
+
+        # Generate alerts for high-risk findings
+        alerts_created = []
+
+        # Alert for sensitive data
+        if "error" not in results["sensitive_data"]:
+            sensitive_class = results["sensitive_data"].get("result", {}).get("classification", "")
+            if sensitive_class in ["PII", "Financial", "Secrets", "SENSITIVE"]:
+                alert = alerting.format_sensitive_data_alert(analysis_text, results["sensitive_data"])
+                alert_result = await alerting.create_alert(alert)
+                if alert_result.get("status") == "success":
+                    alerts_created.append("sensitive_data")
+
+        # Alert for phishing
+        if "error" not in results["phishing"]:
+            phishing_status = results["phishing"].get("status", "")
+            if phishing_status == "Phishing":
+                alert = alerting.format_phishing_alert(analysis_text, results["phishing"])
+                alert_result = await alerting.create_alert(alert)
+                if alert_result.get("status") == "success":
+                    alerts_created.append("phishing")
+
+        # Alert for code injection
+        if "error" not in results["code_injection"]:
+            injection_status = results["code_injection"].get("status", "")
+            if injection_status == "Injection":
+                alert = alerting.format_code_injection_alert(analysis_text, results["code_injection"])
+                alert_result = await alerting.create_alert(alert)
+                if alert_result.get("status") == "success":
+                    alerts_created.append("code_injection")
+
+        # Alert for poor data quality
+        if "error" not in results["data_quality"]:
+            quality_score = results["data_quality"].get("quality_score", 1.0)
+            if quality_score < 0.7:
+                alert = alerting.format_data_quality_alert(analysis_text, results["data_quality"])
+                alert_result = await alerting.create_alert(alert)
+                if alert_result.get("status") == "success":
+                    alerts_created.append("data_quality")
+
         return {
             "analysis_type": "Comprehensive Security Analysis",
             "timestamp": datetime.utcnow().isoformat(),
             "overall_risk_score": overall_risk,
             "risk_level": _get_risk_level(overall_risk),
-            "analyses": {
-                "sensitive_data": sensitive_result,
-                "data_quality": quality_result,
-                "phishing": phishing_result.get("result", {}),
-                "code_injection": code_injection_result.get("result", {})
-            }
+            "model_artifacts_used": {
+                "sensitive_data_model": "error" not in results["sensitive_data"],
+                "data_quality_model": "error" not in results["data_quality"],
+                "phishing_model": "error" not in results["phishing"],
+                "code_injection_model": "error" not in results["code_injection"]
+            },
+            "results": results,
+            "alerts_created": alerts_created,
+            "file_metadata": file_metadata
         }
-        
+
     except Exception as e:
+        print(f"Comprehensive analysis error: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Error in comprehensive analysis: {str(e)}"

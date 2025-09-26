@@ -21,63 +21,124 @@ class ThreatProvider with ChangeNotifier {
   List<ScanResult> get scanHistory => List.unmodifiable(_scanHistory);
   int get totalScans => _scanHistory.length;
   String _determineThreatType(Map<String, dynamic> analysis) {
-    final analyses = analysis['analyses'] ?? {};
+    final results = analysis['results'] ?? {};
 
-    if ((analyses['phishing']?['is_phishing'] ?? false) == true) {
+    // Check for phishing
+    if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       return 'Phishing Attempt';
     }
-    if ((analyses['code_injection']?['is_injection'] ?? false) == true) {
+
+    // Check for code injection
+    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
       return 'Code Injection Detected';
     }
-    if ((analyses['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+
+    // Check for sensitive data
+    if ((results['sensitive_data']?['classification'] != null &&
+         results['sensitive_data']['classification'] != 'UNKNOWN' &&
+         results['sensitive_data']['classification'] != 'ERROR') ||
+        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
       return 'Sensitive Data Found';
     }
+
+    // Check for poor data quality
+    if ((results['data_quality']?['quality_score'] ?? 1.0) < 0.7) {
+      return 'Data Quality Issues';
+    }
+
     return 'No Threats Detected';
   }
 
   String _generateThreatDetails(Map<String, dynamic> analysis) {
-    final analyses = analysis['analyses'] ?? {};
+    final results = analysis['results'] ?? {};
     final List<String> threats = [];
 
-    if ((analyses['phishing']?['is_phishing'] ?? false) == true) {
-      final urls = analyses['phishing']?['suspicious_urls'] ?? [];
-      if (urls.isNotEmpty) {
-        threats.add('Suspicious URLs: ${urls.length} found');
+    // Phishing details
+    if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
+      final phishing = results['phishing'];
+      if (phishing?['suspicious_urls'] != null && (phishing['suspicious_urls'] as List).isNotEmpty) {
+        threats.add('Suspicious URLs: ${(phishing['suspicious_urls'] as List).length} found');
       }
-      if (analyses['phishing']?['contains_urgency_keywords'] == true) {
+      if (phishing?['contains_urgency_keywords'] == true) {
         threats.add('Urgency indicators detected');
       }
+      if (phishing?['confidence'] != null) {
+        threats.add('Phishing confidence: ${(phishing['confidence'] * 100).toStringAsFixed(1)}%');
+      }
     }
 
-    if ((analyses['code_injection']?['is_injection'] ?? false) == true) {
-      final patterns = analyses['code_injection']?['detected_patterns'] ?? [];
-      threats.add('Suspicious code patterns: ${patterns.length} found');
+    // Code injection details
+    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
+      final injection = results['code_injection'];
+      if (injection?['detected_patterns'] != null && (injection['detected_patterns'] as List).isNotEmpty) {
+        threats.add('Suspicious code patterns: ${(injection['detected_patterns'] as List).length} found');
+      }
+      if (injection?['confidence'] != null) {
+        threats.add('Injection confidence: ${(injection['confidence'] * 100).toStringAsFixed(1)}%');
+      }
     }
 
-    if ((analyses['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
-      threats.add('Sensitive data detected');
+    // Sensitive data details
+    if ((results['sensitive_data']?['classification'] != null &&
+         results['sensitive_data']['classification'] != 'UNKNOWN' &&
+         results['sensitive_data']['classification'] != 'ERROR') ||
+        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+      final sensitive = results['sensitive_data'];
+      if (sensitive?['classification'] != null) {
+        threats.add('Data classification: ${sensitive['classification']}');
+      }
+      if (sensitive?['confidence'] != null) {
+        threats.add('Classification confidence: ${(sensitive['confidence'] * 100).toStringAsFixed(1)}%');
+      }
     }
 
-    return threats.isEmpty ? 'No specific threats detected' : threats.join('\n• ');
+    // Data quality details
+    if ((results['data_quality']?['quality_score'] ?? 1.0) < 0.7) {
+      final quality = results['data_quality'];
+      if (quality?['quality_score'] != null) {
+        threats.add('Quality score: ${(quality['quality_score'] * 100).toStringAsFixed(1)}%');
+      }
+      if (quality?['issues'] != null && (quality['issues'] as List).isNotEmpty) {
+        threats.add('Quality issues: ${(quality['issues'] as List).length} found');
+      }
+    }
+
+    return threats.isEmpty ? 'No specific threats detected' : threats.join(' • ');
   }
 
   List<String> _generateRecommendedActions(Map<String, dynamic> analysis) {
-    final analyses = analysis['analyses'] ?? {};
+    final results = analysis['results'] ?? {};
     final List<String> actions = [];
 
-    if ((analyses['phishing']?['is_phishing'] ?? false) == true) {
+    // Phishing recommendations
+    if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       actions.add('Do not click on any links in this content');
       actions.add('Verify the sender before taking any action');
+      actions.add('Delete this message immediately');
     }
 
-    if ((analyses['code_injection']?['is_injection'] ?? false) == true) {
+    // Code injection recommendations
+    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
       actions.add('Do not execute this code');
       actions.add('Review the input for suspicious patterns');
+      actions.add('Use parameterized queries for database interactions');
     }
 
-    if ((analyses['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+    // Sensitive data recommendations
+    if ((results['sensitive_data']?['classification'] != null &&
+         results['sensitive_data']['classification'] != 'UNKNOWN' &&
+         results['sensitive_data']['classification'] != 'ERROR') ||
+        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
       actions.add('Remove or redact sensitive information before sharing');
       actions.add('Review data handling policies');
+      actions.add('Consider encrypting this data if it needs to be stored');
+    }
+
+    // Data quality recommendations
+    if ((results['data_quality']?['quality_score'] ?? 1.0) < 0.7) {
+      actions.add('Review the data ingestion pipeline');
+      actions.add('Ensure data is complete, consistent, and properly formatted');
+      actions.add('Check data sources for quality issues');
     }
 
     return actions.isNotEmpty ? actions : ['No specific actions required'];
@@ -124,7 +185,7 @@ class ThreatProvider with ChangeNotifier {
   }
 }
 
-  /// Analyze a file for potential threats
+  /// Analyze a file for potential threats using comprehensive analysis
   Future<ScanResult?> analyzeFile(PlatformFile file) async {
     if ((file.bytes == null || file.bytes!.isEmpty) && (file.path == null || file.path!.isEmpty)) {
       _error = 'Selected file is empty or invalid';
@@ -137,41 +198,24 @@ class ThreatProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // In a real app, this would upload the file to your API
-      // For now, we'll simulate an API call with mock data
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Get file extension safely
-      final fileName = file.name;
-      final fileExt = fileName.contains('.') 
-          ? fileName.split('.').last.toLowerCase() 
-          : 'unknown';
-      
-      final isExecutable = ['exe', 'dll', 'js', 'vbs', 'ps1', 'bat', 'sh'].contains(fileExt);
-      final isDocument = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].contains(fileExt);
-      final isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExt);
-      
-      // Check file size (in bytes)
-      final fileSize = file.size;
-      final isLargeFile = fileSize > 10 * 1024 * 1024; // 10MB
-      
-      final isThreat = isExecutable || (isDocument && file.size! > 10 * 1024 * 1024); // >10MB docs are suspicious
+      final apiService = ApiService();
+      final analysis = await apiService.analyzeFileComprehensive(file);
       
       final result = ScanResult(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        isThreat: isThreat,
-        threatType: isThreat ? (isExecutable ? 'executable_file' : 'suspicious_document') : null,
-        threatDetails: isThreat 
-            ? (isExecutable 
-                ? 'Executable files can contain malicious code' 
-                : 'Document is unusually large and may contain embedded threats. Please review the file contents carefully before opening.')
-            : null,
-        threatScore: isThreat ? (isExecutable ? 0.95 : 0.7) : 0.1,
+        isThreat: analysis['overall_risk_score'] > 0.5, // Adjust threshold as needed
+        threatType: _determineThreatType(analysis),
+        threatDetails: _generateThreatDetails(analysis),
+        threatScore: analysis['overall_risk_score'],
         scannedContentPreview: 'File: ${file.name} (${_formatFileSize(file.size)})',
-        scanType: 'file',
-        recommendedActions: isThreat 
-            ? ['Do not open the file', 'Scan with antivirus', 'Delete if not needed'] 
-            : ['File appears to be safe'],
+        scanType: 'comprehensive_file',
+        recommendedActions: _generateRecommendedActions(analysis),
+        rawAnalysis: analysis,
+        metadata: {
+          'filename': file.name,
+          'file_size': file.size,
+          'file_type': file.extension,
+        },
       );
       
       _lastScanResult = result;

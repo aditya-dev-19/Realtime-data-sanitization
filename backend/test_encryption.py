@@ -6,7 +6,6 @@ import requests
 import asyncio
 from pathlib import Path
 
-
 # Simple .env file loader without external dependencies
 def load_env_file():
     """
@@ -42,7 +41,7 @@ kms_key_ring = os.getenv('KMS_KEY_RING')
 kms_crypto_key = os.getenv('KMS_CRYPTO_KEY')
 
 # This script assumes your server is running on localhost at port 8000
-API_URL = "http://localhost:8000"
+API_URL = "https://cybersecurity-api-service-44185828496.us-central1.run.app"
 
 def test_api_endpoints():
     """

@@ -327,12 +327,12 @@ Future<Map<String, dynamic>> _makeApiRequest(
     }
   }
   
-  // Analyze File for Threats
-  Future<Map<String, dynamic>> analyzeFile(PlatformFile file) async {
+  // Analyze File for Threats using comprehensive analysis
+  Future<Map<String, dynamic>> analyzeFileComprehensive(PlatformFile file) async {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$_baseUrl/analyze-file'),
+        Uri.parse('$_baseUrl/comprehensive-analysis'),
       );
       
       // Add headers
@@ -342,19 +342,15 @@ Future<Map<String, dynamic>> _makeApiRequest(
         }
       });
       
-      // Add file
+      // Add file as text content for comprehensive analysis
       if (file.bytes != null) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'file',
-          file.bytes!,
-          filename: file.name,
-        ));
+        // Convert file bytes to string for text analysis
+        String fileContent = utf8.decode(file.bytes!);
+        request.fields['text'] = fileContent;
       } else if (file.path != null) {
-        request.files.add(await http.MultipartFile.fromPath(
-          'file',
-          file.path!,
-          filename: file.name,
-        ));
+        // Read file from path
+        final fileData = await File(file.path!).readAsString();
+        request.fields['text'] = fileData;
       } else {
         throw Exception('No file data available');
       }
@@ -366,10 +362,10 @@ Future<Map<String, dynamic>> _makeApiRequest(
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes));
       } else {
-        throw Exception('Failed to analyze file: ${response.statusCode}');
+        throw Exception('Failed to analyze file comprehensively: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error in analyzeFile: $e');
+      debugPrint('Error in analyzeFileComprehensive: $e');
       rethrow;
     }
   }

@@ -216,7 +216,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
   Widget _buildScanResult(ScanResult result) {
     final bool isThreat = result.isThreat;
     final analysis = result.rawAnalysis ?? {};
-    final analyses = analysis['analyses'] ?? {};
+    final analyses = analysis['results'] ?? {};
+    final modelArtifacts = analysis['model_artifacts_used'] ?? {};
+    final fileMetadata = analysis['file_metadata'];
 
     return Card(
       elevation: 4,
@@ -263,6 +265,16 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                           ),
                         ),
                       ],
+                      if (modelArtifacts.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'AI Models Used: ${modelArtifacts.values.where((used) => used == true).length}/${modelArtifacts.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -291,6 +303,25 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
               const SizedBox(height: 16),
             ],
 
+            // File Information (if applicable)
+            if (fileMetadata != null) ...[
+              const Text(
+                'File Information:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('Filename: ${fileMetadata['filename']}'),
+              Text('Size: ${_formatFileSize(fileMetadata['size'])}'),
+              Text('Type: ${fileMetadata['content_type'] ?? 'Unknown'}'),
+              if (analyses['file_analysis'] != null) ...[
+                Text('SHA-256: ${analyses['file_analysis']['file_hash']?.substring(0, 16)}...'),
+              ],
+              const SizedBox(height: 16),
+            ],
+
             if (isThreat) ...[
               const Text(
                 'Threat Details:',
@@ -308,22 +339,61 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
             _buildAnalysisSection(
               title: 'Sensitive Data Analysis',
               analysis: analyses['sensitive_data'] ?? {},
+              modelUsed: modelArtifacts['sensitive_data_model'] ?? false,
             ),
 
             _buildAnalysisSection(
               title: 'Phishing Detection',
               analysis: analyses['phishing'] ?? {},
+              modelUsed: modelArtifacts['phishing_model'] ?? false,
             ),
 
             _buildAnalysisSection(
               title: 'Code Injection Analysis',
               analysis: analyses['code_injection'] ?? {},
+              modelUsed: modelArtifacts['code_injection_model'] ?? false,
             ),
 
             _buildAnalysisSection(
               title: 'Data Quality Assessment',
               analysis: analyses['data_quality'] ?? {},
+              modelUsed: modelArtifacts['data_quality_model'] ?? false,
             ),
+
+            // File-specific analysis
+            if (analyses['file_analysis'] != null) ...[
+              _buildAnalysisSection(
+                title: 'File Analysis',
+                analysis: analyses['file_analysis'],
+                modelUsed: true,
+              ),
+            ],
+
+            // Alerts Created
+            if (analysis['alerts_created'] != null && (analysis['alerts_created'] as List).isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Security Alerts Created:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ... (analysis['alerts_created'] as List).map((alert) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.notification_important, size: 16, color: Colors.orange),
+                        const SizedBox(width: 4),
+                        Text(
+                          alert.toString().replaceAll('_', ' ').toUpperCase(),
+                          style: const TextStyle(color: Colors.orange),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+            ],
 
             // Recommended Actions
             if (result.recommendedActions.isNotEmpty) ...[
@@ -368,11 +438,35 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     );
   }
   
-  Widget _buildAnalysisSection({required String title, required Map<String, dynamic> analysis}) {
+  Widget _buildAnalysisSection({required String title, required Map<String, dynamic> analysis, bool modelUsed = false}) {
     return ExpansionTile(
-      title: Text(
-        title,
-        style: TextStyle(fontWeight: FontWeight.bold),
+      title: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: modelUsed ? Colors.green.shade100 : Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: modelUsed ? Colors.green : Colors.orange,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              modelUsed ? 'AI Model' : 'Basic',
+              style: TextStyle(
+                fontSize: 10,
+                color: modelUsed ? Colors.green.shade800 : Colors.orange.shade800,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
       children: [
         Padding(
