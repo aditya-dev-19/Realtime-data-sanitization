@@ -526,4 +526,28 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
+
+  String _formatFileSize(dynamic size) {
+    if (size == null) return 'Unknown';
+
+    double bytes = 0;
+    if (size is int) {
+      bytes = size.toDouble();
+    } else if (size is double) {
+      bytes = size;
+    } else if (size is String) {
+      bytes = double.tryParse(size) ?? 0;
+    }
+
+    if (bytes == 0) return '0 B';
+
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = 0;
+    while (bytes >= 1024 && i < suffixes.length - 1) {
+      bytes /= 1024;
+      i++;
+    }
+
+    return '${bytes.toStringAsFixed(1)} ${suffixes[i]}';
+  }
 }

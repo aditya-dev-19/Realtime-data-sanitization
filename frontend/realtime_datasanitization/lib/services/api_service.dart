@@ -114,7 +114,7 @@ Future<Map<String, dynamic>> detectCodeInjection(String text) async {
 
 // Comprehensive analysis
 Future<Map<String, dynamic>> runComprehensiveAnalysis(String text) async {
-  return _makeApiRequest('/comprehensive-analysis', {'text': text});
+  return _makeFormApiRequest('/comprehensive-analysis', {'text': text});
 }
 
 // Helper method for API requests
@@ -128,6 +128,42 @@ Future<Map<String, dynamic>> _makeApiRequest(
       headers: _headers,
       body: jsonEncode(data),
     );
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('API request failed: ${response.statusCode}');
+    }
+  } catch (e) {
+    debugPrint('API Error: $e');
+    rethrow;
+  }
+}
+
+// Helper method for API requests with form data
+Future<Map<String, dynamic>> _makeFormApiRequest(
+  String endpoint, 
+  Map<String, String> fields
+) async {
+  try {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl$endpoint'),
+    );
+    
+    // Add headers
+    _headers.forEach((key, value) {
+      if (key.toLowerCase() != 'content-type') { // Don't set Content-Type for multipart
+        request.headers[key] = value;
+      }
+    });
+    
+    // Add fields
+    request.fields.addAll(fields);
+    
+    // Send request
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
     
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
