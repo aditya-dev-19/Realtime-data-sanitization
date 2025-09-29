@@ -54,7 +54,26 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
       );
       return;
     }
-
+    // Check if the file has been scanned
+    if (_scanResult == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please analyze the file before encrypting.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    // Check if the file has been scanned and if it's a threat.
+    if (_scanResult != null && _scanResult!.isThreat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot encrypt a malicious file.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() {
       _isEncrypting = true;
     });
@@ -206,7 +225,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
 
             if (_selectedFile != null) ...[
               ElevatedButton(
-                onPressed: _isEncrypting ? null : _encryptAndUploadFile,
+                onPressed: _isEncrypting || _scanResult == null || (_scanResult != null && _scanResult!.isThreat)
+                    ? null
+                    : _encryptAndUploadFile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   padding: const EdgeInsets.symmetric(vertical: 16),
