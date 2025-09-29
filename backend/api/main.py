@@ -347,7 +347,7 @@ async def comprehensive_analysis(
         try:
             code_injection_result = orch.detect_code_injection(analysis_text)
             results["code_injection"] = code_injection_result
-            print(f"Code injection analysis completed: {code_injection_result.get('status', 'Unknown')}")
+            print(f"Code injection analysis completed: {code_injection_result.get('status', 'Unknown')}, confidence: {code_injection_result.get('confidence', 0)}")
         except Exception as e:
             results["code_injection"] = {
                 "error": f"Code injection detection failed: {str(e)}",
@@ -448,12 +448,12 @@ async def comprehensive_analysis(
             is_injection = injection_result.get("is_injection", False)
             confidence = injection_result.get("confidence", 0)
             
-            # Check multiple indicators for code injection
-            # Include XSS, SQL Injection, and other injection types
+            # Check multiple indicators for code injection - FIXED LOGIC
+            # Only create alerts for clear injection indicators, not for uncertain results
             injection_detected = (
                 injection_status in ["Injection", "XSS", "SQL Injection", "Command Injection"] or
                 is_injection or
-                (confidence > 0.5 and injection_status not in ["Safe", "Clean"])
+                (confidence > 0.8 and injection_status == "Injection")  # Higher threshold and specific status
             )
             
             if injection_detected:
@@ -464,7 +464,7 @@ async def comprehensive_analysis(
                     alerts_created.append("code_injection")
                     print(f"✅ Code injection alert created successfully")
             else:
-                print(f"ℹ️ No code injection detected. Status: {injection_status}, confidence: {confidence}")
+                print(f"ℹ️ No code injection detected. Status: {injection_status}, confidence: {confidence}, is_injection: {is_injection}")
 
         # Alert for poor data quality
         if "error" not in results["data_quality"]:

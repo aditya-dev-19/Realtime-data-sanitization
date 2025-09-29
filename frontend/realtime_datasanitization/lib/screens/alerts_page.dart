@@ -55,26 +55,63 @@ class _AlertsPageState extends State<AlertsPage> {
       appBar: AppBar(
         title: const Text('Security Alerts'),
         actions: [
-          // Refresh button
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => alertsProvider.fetchAlerts(),
+          // Refresh button with loading indicator
+          Consumer<AlertsProvider>(
+            builder: (context, alertsProvider, child) {
+              return IconButton(
+                icon: alertsProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: alertsProvider.isLoading
+                    ? null
+                    : () => alertsProvider.fetchAlerts(forceRefresh: true),
+              );
+            },
           ),
         ],
       ),
       body: Column(
         children: [
+          // Last updated info
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.grey[800],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  alertsProvider.lastFetched != null
+                      ? 'Last updated: ${timeago.format(alertsProvider.lastFetched!)}'
+                      : 'Alerts not loaded yet',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                if (alertsProvider.isLoading)
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ),
           _buildFilterChips(),
           Expanded(
-            child: alertsProvider.isLoading
+            child: alertsProvider.isLoading && alertsProvider.alerts.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : filteredAlerts.isEmpty
                     ? const Center(child: Text('No alerts found.'))
-                    : ListView.builder(
-                        itemCount: filteredAlerts.length,
-                        itemBuilder: (ctx, i) => AlertListItem(
-                          alert: filteredAlerts[i],
-                          severityColor: _getSeverityColor(filteredAlerts[i].severity),
+                    : RefreshIndicator(
+                        onRefresh: () => alertsProvider.fetchAlerts(forceRefresh: true),
+                        child: ListView.builder(
+                          itemCount: filteredAlerts.length,
+                          itemBuilder: (ctx, i) => AlertListItem(
+                            alert: filteredAlerts[i],
+                            severityColor: _getSeverityColor(filteredAlerts[i].severity),
+                          ),
                         ),
                       ),
           ),

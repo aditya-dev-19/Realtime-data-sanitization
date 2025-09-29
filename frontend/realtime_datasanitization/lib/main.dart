@@ -158,6 +158,12 @@ class _MyAppContentState extends State<MyAppContent> {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
       onTap: (index) {
+        // If alerts tab was tapped, refresh alerts
+        if (index == 2 && _currentIndex != 2) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<AlertsProvider>().fetchAlerts(forceRefresh: true);
+          });
+        }
         setState(() {
           _currentIndex = index;
         });
