@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -17,9 +18,72 @@ class ThreatProvider with ChangeNotifier {
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
-  ScanResult? get lastScanResult => _lastScanResult;
   List<ScanResult> get scanHistory => List.unmodifiable(_scanHistory);
   int get totalScans => _scanHistory.length;
+  bool _determineIsThreat(Map<String, dynamic> analysis) {
+    final results = analysis['results'] ?? {};
+
+    print('🔍 DEBUG: Determining threat status');
+    print('Phishing: ${results['phishing']}');
+    print('Code injection: ${results['code_injection']}');
+    print('Sensitive data: ${results['sensitive_data']}');
+    print('Data quality: ${results['data_quality']}');
+
+    // Check for any threats
+    if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
+      print('🚨 DEBUG: Phishing threat detected');
+      return true;
+    }
+
+    // Check for code injection
+    final codeInjection = results['code_injection'];
+    print('💉 DEBUG: Code injection result: $codeInjection');
+
+    if (codeInjection != null) {
+      final status = codeInjection['status'];
+      final confidence = codeInjection['confidence'];
+      print('💉 DEBUG: Code injection - status: $status, confidence: $confidence');
+
+      if (status == 'Injection' || status == 'XSS' || (codeInjection['is_injection'] ?? false) == true) {
+        print('💉 DEBUG: Code injection threat detected');
+        return true;
+      }
+    } else {
+      print('💉 DEBUG: Code injection result is null');
+    }
+
+    // Check for sensitive data (only if actually sensitive)
+    final sensitiveData = results['sensitive_data'];
+    final classification = sensitiveData?['classification'];
+    print('🔒 DEBUG: Sensitive data check - classification: $classification, has_sensitive_data: ${sensitiveData?['has_sensitive_data'] ?? false}');
+
+    if (classification != null &&
+        classification != 'Safe' &&
+        classification != 'UNKNOWN' &&
+        classification != 'ERROR' &&
+        classification != 'NOT_SENSITIVE') {
+      print('🔒 DEBUG: Sensitive data threat detected via classification: $classification');
+      return true;
+    }
+
+    // Also check the has_sensitive_data flag
+    if ((sensitiveData?['has_sensitive_data'] ?? false) == true) {
+      print('🔒 DEBUG: Sensitive data threat detected via has_sensitive_data flag');
+      return true;
+    }
+
+    final qualityScore = results['data_quality']?['quality_score'] ?? 1.0;
+    print('📊 DEBUG: Data quality score: $qualityScore');
+
+    if (qualityScore < 0.7) {
+      print('📊 DEBUG: Data quality threat detected');
+      return true;
+    }
+
+    print('✅ DEBUG: No threats detected');
+    return false;
+  }
+
   String _determineThreatType(Map<String, dynamic> analysis) {
     final results = analysis['results'] ?? {};
 
@@ -29,15 +93,23 @@ class ThreatProvider with ChangeNotifier {
     }
 
     // Check for code injection
-    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
+    final codeInjection = results['code_injection'];
+    if (codeInjection != null && (codeInjection['status'] == 'Injection' || codeInjection['status'] == 'XSS' || (codeInjection['is_injection'] ?? false) == true)) {
       return 'Code Injection Detected';
     }
 
-    // Check for sensitive data
-    if ((results['sensitive_data']?['classification'] != null &&
-         results['sensitive_data']['classification'] != 'UNKNOWN' &&
-         results['sensitive_data']['classification'] != 'ERROR') ||
-        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+    // Check for sensitive data (only if actually sensitive)
+    final sensitiveData = results['sensitive_data'];
+    final classification = sensitiveData?['classification'];
+    if (classification != null &&
+        classification != 'Safe' &&
+        classification != 'UNKNOWN' &&
+        classification != 'ERROR' &&
+        classification != 'NOT_SENSITIVE') {
+      return 'Sensitive Data Found';
+    }
+    // Also check has_sensitive_data flag
+    if ((sensitiveData?['has_sensitive_data'] ?? false) == true) {
       return 'Sensitive Data Found';
     }
 
@@ -56,40 +128,99 @@ class ThreatProvider with ChangeNotifier {
     // Phishing details
     if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       final phishing = results['phishing'];
+      final phishingDetails = <String>[];
+
       if (phishing?['suspicious_urls'] != null && (phishing['suspicious_urls'] as List).isNotEmpty) {
-        threats.add('Suspicious URLs: ${(phishing['suspicious_urls'] as List).length} found');
+        final urls = phishing['suspicious_urls'] as List;
+        phishingDetails.add('${urls.length} suspicious URL${urls.length > 1 ? 's' : ''} found');
+        // Add first few URLs as examples
+        for (int i = 0; i < urls.length && i < 3; i++) {
+          phishingDetails.add('  • ${urls[i]}');
+        }
+        if (urls.length > 3) {
+          phishingDetails.add('  • ... and ${urls.length - 3} more');
+        }
       }
       if (phishing?['contains_urgency_keywords'] == true) {
-        threats.add('Urgency indicators detected');
+        phishingDetails.add('Urgency indicators detected (e.g., "urgent", "immediate action required")');
+      }
+      if (phishing?['suspicious_sender'] == true) {
+        phishingDetails.add('Suspicious sender domain detected');
       }
       if (phishing?['confidence'] != null) {
-        threats.add('Phishing confidence: ${(phishing['confidence'] * 100).toStringAsFixed(1)}%');
+        phishingDetails.add('Detection confidence: ${(phishing['confidence'] * 100).toStringAsFixed(1)}%');
+      }
+
+      if (phishingDetails.isNotEmpty) {
+        threats.add('🚨 Phishing Detected:\n${phishingDetails.join('\n')}');
       }
     }
 
     // Code injection details
-    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
-      final injection = results['code_injection'];
-      if (injection?['detected_patterns'] != null && (injection['detected_patterns'] as List).isNotEmpty) {
-        threats.add('Suspicious code patterns: ${(injection['detected_patterns'] as List).length} found');
-      }
-      if (injection?['confidence'] != null) {
-        threats.add('Injection confidence: ${(injection['confidence'] * 100).toStringAsFixed(1)}%');
+    final codeInjection = results['code_injection'];
+    if (codeInjection != null) {
+      final status = codeInjection['status'];
+      final confidence = codeInjection['confidence'];
+      final details = codeInjection['details'];
+
+      print('💉 DEBUG: Processing code injection details - status: $status, confidence: $confidence');
+
+      if (status == 'Injection' || status == 'XSS' || (codeInjection['is_injection'] ?? false) == true) {
+        final injectionDetails = <String>[];
+
+        // Handle different response structures
+        if (details != null && details is Map) {
+          final patterns = details['patterns_found'] ?? details['detected_patterns'];
+          if (patterns != null && patterns is List && patterns.isNotEmpty) {
+            injectionDetails.add('${patterns.length} suspicious pattern${patterns.length > 1 ? 's' : ''} detected');
+            // Add first few patterns as examples
+            for (int i = 0; i < patterns.length && i < 3; i++) {
+              injectionDetails.add('  • ${patterns[i]}');
+            }
+            if (patterns.length > 3) {
+              injectionDetails.add('  • ... and ${patterns.length - 3} more');
+            }
+          }
+        }
+
+        if (confidence != null) {
+          injectionDetails.add('Detection confidence: ${(confidence * 100).toStringAsFixed(1)}%');
+        }
+
+        if (injectionDetails.isNotEmpty) {
+          threats.add('💉 Code Injection Detected:\n${injectionDetails.join('\n')}');
+          print('💉 DEBUG: Added code injection details to threats');
+        }
       }
     }
 
-    // Sensitive data details
-    if ((results['sensitive_data']?['classification'] != null &&
-         results['sensitive_data']['classification'] != 'UNKNOWN' &&
-         results['sensitive_data']['classification'] != 'ERROR') ||
-        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+    // Sensitive data details (only if actually detected)
+    if (results['sensitive_data']?['classification'] != null &&
+        results['sensitive_data']['classification'] != 'UNKNOWN' &&
+        results['sensitive_data']['classification'] != 'ERROR' &&
+        results['sensitive_data']['classification'] != 'NOT_SENSITIVE') {
       final sensitive = results['sensitive_data'];
+      final sensitiveDetails = <String>[];
+
       if (sensitive?['classification'] != null) {
-        threats.add('Data classification: ${sensitive['classification']}');
+        sensitiveDetails.add('Data type: ${sensitive['classification']}');
       }
       if (sensitive?['confidence'] != null) {
-        threats.add('Classification confidence: ${(sensitive['confidence'] * 100).toStringAsFixed(1)}%');
+        sensitiveDetails.add('Classification confidence: ${(sensitive['confidence'] * 100).toStringAsFixed(1)}%');
       }
+      if (sensitive?['details'] != null) {
+        sensitiveDetails.add('Details: ${sensitive['details']}');
+      }
+
+      if (sensitiveDetails.isNotEmpty) {
+        threats.add('🔒 Sensitive Data Detected:\n${sensitiveDetails.join('\n')}');
+      }
+    }
+    // Also check has_sensitive_data flag for additional safety
+    else if ((results['sensitive_data']?['has_sensitive_data'] ?? false) == true &&
+             results['sensitive_data']?['classification'] != 'UNKNOWN' &&
+             results['sensitive_data']?['classification'] != 'ERROR') {
+      threats.add('🔒 Sensitive Data Detected: ${results['sensitive_data']['classification'] ?? 'Unknown type'}');
     }
 
     // Data quality details
@@ -118,17 +249,22 @@ class ThreatProvider with ChangeNotifier {
     }
 
     // Code injection recommendations
-    if ((results['code_injection']?['status'] == 'Injection') || (results['code_injection']?['is_injection'] ?? false) == true) {
+    final codeInjection = results['code_injection'];
+    if (codeInjection != null && (codeInjection['status'] == 'Injection' || codeInjection['status'] == 'XSS' || (codeInjection['is_injection'] ?? false) == true)) {
       actions.add('Do not execute this code');
       actions.add('Review the input for suspicious patterns');
       actions.add('Use parameterized queries for database interactions');
     }
 
     // Sensitive data recommendations
-    if ((results['sensitive_data']?['classification'] != null &&
-         results['sensitive_data']['classification'] != 'UNKNOWN' &&
-         results['sensitive_data']['classification'] != 'ERROR') ||
-        (results['sensitive_data']?['has_sensitive_data'] ?? false) == true) {
+    final sensitiveData = results['sensitive_data'];
+    final classification = sensitiveData?['classification'];
+    if ((classification != null &&
+         classification != 'Safe' &&
+         classification != 'UNKNOWN' &&
+         classification != 'ERROR' &&
+         classification != 'NOT_SENSITIVE') ||
+        (sensitiveData?['has_sensitive_data'] ?? false) == true) {
       actions.add('Remove or redact sensitive information before sharing');
       actions.add('Review data handling policies');
       actions.add('Consider encrypting this data if it needs to be stored');
@@ -158,10 +294,13 @@ class ThreatProvider with ChangeNotifier {
   try {
     final apiService = ApiService();
     final analysis = await apiService.runComprehensiveAnalysis(text);
-    
+
+    print('📡 DEBUG: Raw analysis response:');
+    print(jsonEncode(analysis));
+
     final result = ScanResult(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      isThreat: analysis['overall_risk_score'] > 0.5, // Adjust threshold as needed
+      isThreat: _determineIsThreat(analysis),
       threatType: _determineThreatType(analysis),
       threatDetails: _generateThreatDetails(analysis),
       threatScore: analysis['overall_risk_score'],
@@ -170,6 +309,9 @@ class ThreatProvider with ChangeNotifier {
       recommendedActions: _generateRecommendedActions(analysis),
       rawAnalysis: analysis,
     );
+
+    print('🎯 DEBUG: Final ScanResult - isThreat: ${result.isThreat}, threatType: ${result.threatType}');
+    print('🎯 DEBUG: Overall risk score: ${analysis['overall_risk_score']}');
     
     _lastScanResult = result;
     _scanHistory.insert(0, result);
@@ -200,10 +342,13 @@ class ThreatProvider with ChangeNotifier {
     try {
       final apiService = ApiService();
       final analysis = await apiService.analyzeFileComprehensive(file);
-      
+
+      print('📡 DEBUG: Raw file analysis response:');
+      print(jsonEncode(analysis));
+
       final result = ScanResult(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        isThreat: analysis['overall_risk_score'] > 0.5, // Adjust threshold as needed
+        isThreat: _determineIsThreat(analysis),
         threatType: _determineThreatType(analysis),
         threatDetails: _generateThreatDetails(analysis),
         threatScore: analysis['overall_risk_score'],
@@ -217,6 +362,9 @@ class ThreatProvider with ChangeNotifier {
           'file_type': file.extension,
         },
       );
+
+      print('🎯 DEBUG: Final file ScanResult - isThreat: ${result.isThreat}, threatType: ${result.threatType}');
+      print('🎯 DEBUG: File overall risk score: ${analysis['overall_risk_score']}');
       
       _lastScanResult = result;
       _scanHistory.insert(0, result);

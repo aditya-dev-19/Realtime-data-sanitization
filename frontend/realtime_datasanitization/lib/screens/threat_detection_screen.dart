@@ -254,17 +254,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (analysis['overall_risk_score'] != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Risk Level: ${_getRiskLevel(analysis['overall_risk_score'])}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isThreat ? Colors.red : Colors.green,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
                       if (modelArtifacts.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -282,26 +271,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
             ),
 
             const SizedBox(height: 16),
-
-            // Risk Score Bar
-            if (analysis['overall_risk_score'] != null) ...[
-              LinearProgressIndicator(
-                value: analysis['overall_risk_score'],
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _getRiskColor(analysis['overall_risk_score'])
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Risk Score: ${analysis['overall_risk_score'].toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: _getRiskColor(analysis['overall_risk_score']),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
 
             // File Information (if applicable)
             if (fileMetadata != null) ...[
@@ -482,6 +451,48 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
       return const Text('No data available');
     }
 
+    // If there's an error in analysis, show it
+    if (analysis.containsKey('error')) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Analysis Error: ${analysis['error']}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Format different types of analysis results
+    if (analysis.containsKey('status')) {
+      return _buildThreatAnalysisDetails(analysis);
+    }
+
+    if (analysis.containsKey('classification')) {
+      return _buildClassificationDetails(analysis);
+    }
+
+    if (analysis.containsKey('quality_score')) {
+      return _buildQualityDetails(analysis);
+    }
+
+    if (analysis.containsKey('file_hash')) {
+      return _buildFileDetails(analysis);
+    }
+
+    // Fallback to key-value pairs for unknown formats
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: analysis.entries.map((entry) {
@@ -491,12 +502,12 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${entry.key}: ',
+                '${_formatKey(entry.key)}: ',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Expanded(
                 child: Text(
-                  entry.value.toString(),
+                  _formatValue(entry.value),
                   softWrap: true,
                 ),
               ),
@@ -507,20 +518,233 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     );
   }
 
-  String _getRiskLevel(double score) {
-    if (score >= 0.8) return 'Critical';
-    if (score >= 0.6) return 'High';
-    if (score >= 0.4) return 'Medium';
-    if (score >= 0.2) return 'Low';
-    return 'Info';
+  Widget _buildThreatAnalysisDetails(Map<String, dynamic> analysis) {
+    final List<Widget> details = [];
+
+    if (analysis['status'] == 'Phishing' || analysis['status'] == 'Injection') {
+      details.add(_buildStatusBadge(analysis['status'], critical: true));
+
+      if (analysis['confidence'] != null) {
+        details.add(const SizedBox(height: 8));
+        details.add(Row(
+          children: [
+            const Icon(Icons.analytics, size: 16, color: Colors.blue),
+            const SizedBox(width: 4),
+            Text(
+              'Confidence: ${(analysis['confidence'] * 100).toStringAsFixed(1)}%',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ));
+      }
+
+      if (analysis['suspicious_urls'] != null && (analysis['suspicious_urls'] as List).isNotEmpty) {
+        details.add(const SizedBox(height: 8));
+        details.add(const Text('Suspicious URLs:', style: TextStyle(fontWeight: FontWeight.bold)));
+        final urls = analysis['suspicious_urls'] as List;
+        for (int i = 0; i < urls.length && i < 3; i++) {
+          details.add(Padding(
+            padding: const EdgeInsets.only(left: 16, top: 2),
+            child: Text('• ${urls[i]}', style: const TextStyle(color: Colors.red)),
+          ));
+        }
+        if (urls.length > 3) {
+          details.add(Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text('• ... and ${urls.length - 3} more', style: const TextStyle(color: Colors.red)),
+          ));
+        }
+      }
+
+      if (analysis['contains_urgency_keywords'] == true) {
+        details.add(const SizedBox(height: 8));
+        details.add(Row(
+          children: [
+            const Icon(Icons.warning, size: 16, color: Colors.orange),
+            const SizedBox(width: 4),
+            const Text('Urgency indicators detected'),
+          ],
+        ));
+      }
+    } else if (analysis['status'] == 'Safe' || analysis['status'] == 'Clean') {
+      details.add(_buildStatusBadge(analysis['status'], critical: false));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: details,
+    );
   }
 
-  Color _getRiskColor(double score) {
-    if (score >= 0.8) return Colors.red;
-    if (score >= 0.6) return Colors.orange;
-    if (score >= 0.4) return Colors.amber;
-    if (score >= 0.2) return Colors.lightBlue;
-    return Colors.green;
+  Widget _buildClassificationDetails(Map<String, dynamic> analysis) {
+    final List<Widget> details = [];
+
+    if (analysis['classification'] != null) {
+      details.add(Row(
+        children: [
+          const Icon(Icons.category, size: 16, color: Colors.purple),
+          const SizedBox(width: 4),
+          Text(
+            'Classification: ${analysis['classification']}',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ],
+      ));
+    }
+
+    if (analysis['confidence'] != null) {
+      details.add(const SizedBox(height: 4));
+      details.add(Row(
+        children: [
+          const Icon(Icons.analytics, size: 16, color: Colors.blue),
+          const SizedBox(width: 4),
+          Text(
+            'Confidence: ${(analysis['confidence'] * 100).toStringAsFixed(1)}%',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ],
+      ));
+    }
+
+    if (analysis['details'] != null) {
+      details.add(const SizedBox(height: 4));
+      details.add(Text(
+        'Details: ${analysis['details']}',
+        style: const TextStyle(color: Colors.grey),
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: details,
+    );
+  }
+
+  Widget _buildQualityDetails(Map<String, dynamic> analysis) {
+    final List<Widget> details = [];
+
+    if (analysis['quality_score'] != null) {
+      final score = (analysis['quality_score'] as num).toDouble();
+      details.add(Row(
+        children: [
+          Icon(
+            score >= 0.7 ? Icons.thumb_up : Icons.thumb_down,
+            size: 16,
+            color: score >= 0.7 ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Quality Score: ${(score * 100).toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: score >= 0.7 ? Colors.green : Colors.red,
+            ),
+          ),
+        ],
+      ));
+    }
+
+    if (analysis['issues'] != null && (analysis['issues'] as List).isNotEmpty) {
+      details.add(const SizedBox(height: 8));
+      details.add(const Text('Issues Found:', style: TextStyle(fontWeight: FontWeight.bold)));
+      final issues = analysis['issues'] as List;
+      for (var issue in issues) {
+        details.add(Padding(
+          padding: const EdgeInsets.only(left: 16, top: 2),
+          child: Text('• $issue', style: const TextStyle(color: Colors.orange)),
+        ));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: details,
+    );
+  }
+
+  Widget _buildFileDetails(Map<String, dynamic> analysis) {
+    final List<Widget> details = [];
+
+    if (analysis['file_hash'] != null) {
+      details.add(Row(
+        children: [
+          const Icon(Icons.fingerprint, size: 16, color: Colors.blue),
+          const SizedBox(width: 4),
+          Text(
+            'SHA-256: ${analysis['file_hash']}',
+            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          ),
+        ],
+      ));
+    }
+
+    if (analysis['file_size'] != null) {
+      details.add(const SizedBox(height: 4));
+      details.add(Row(
+        children: [
+          const Icon(Icons.data_usage, size: 16, color: Colors.grey),
+          const SizedBox(width: 4),
+          Text('Size: ${_formatFileSize(analysis['file_size'])}'),
+        ],
+      ));
+    }
+
+    if (analysis['content_type'] != null) {
+      details.add(const SizedBox(height: 4));
+      details.add(Row(
+        children: [
+          const Icon(Icons.description, size: 16, color: Colors.grey),
+          const SizedBox(width: 4),
+          Text('Type: ${analysis['content_type']}'),
+        ],
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: details,
+    );
+  }
+
+  Widget _buildStatusBadge(String status, {bool critical = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: critical
+          ? (status == 'Phishing' || status == 'Injection' ? Colors.red.shade100 : Colors.green.shade100)
+          : Colors.green.shade100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: critical
+            ? (status == 'Phishing' || status == 'Injection' ? Colors.red.shade300 : Colors.green.shade300)
+            : Colors.green.shade300,
+        ),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          color: critical
+            ? (status == 'Phishing' || status == 'Injection' ? Colors.red.shade800 : Colors.green.shade800)
+            : Colors.green.shade800,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _formatKey(String key) {
+    return key.replaceAll('_', ' ').split(' ').map((word) =>
+      word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : ''
+    ).join(' ');
+  }
+
+  String _formatValue(dynamic value) {
+    if (value == null) return 'N/A';
+    if (value is bool) return value ? 'Yes' : 'No';
+    if (value is List) return value.join(', ');
+    if (value is Map) return value.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+    return value.toString();
   }
 
   String _formatDateTime(DateTime dateTime) {

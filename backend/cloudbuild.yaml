@@ -24,15 +24,12 @@ steps:
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
-    # [CORRECTED] Use valid flags for resources and timeout
     - '--memory=4Gi'                # Allocate more memory for loading models
     - '--timeout=900'               # Increase timeout to 15 minutes (900 seconds)
     - '--cpu-boost'                 # Enable CPU boost for faster startup
-    # Important: Ensure your Cloud Run service has permissions to access the GCS bucket.
-    # This is typically done by assigning the 'Storage Object Viewer' role
-    # to the service account used by Cloud Run.
     - '--service-account=firebase-admin-sa@$PROJECT_ID.iam.gserviceaccount.com'
-    - '--set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+    # Environment variables - Added KMS configuration
+    - '--set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCS_BUCKET=store-aajs-123,KMS_PROJECT=$PROJECT_ID,KMS_LOCATION=global,KMS_KEY_RING=my-key-ring,KMS_CRYPTO_KEY=file-wrap-key,FIRESTORE_COLLECTION=file_storage_metadata'
 
 images:
   - 'gcr.io/$PROJECT_ID/realtime-data-sanitization:$COMMIT_SHA'
