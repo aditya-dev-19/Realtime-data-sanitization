@@ -56,31 +56,76 @@ def format_phishing_alert(text: str, result: Dict[str, Any]) -> AlertCreate:
         details=details
     )
 
+# Replace the format_code_injection_alert function in backend/api/alerting.py
+
 def format_code_injection_alert(text: str, result: Dict[str, Any]) -> AlertCreate:
     """Formats an alert for a code injection event."""
-    # Handle both ML model results (score) and rule-based results (confidence)
+    # Handle both ML model results (score/confidence) and rule-based results
     score = result.get('score', result.get('confidence', 0))
+    status = result.get('status', 'Unknown')
     
     # Get patterns from various possible locations
-    patterns = result.get('patterns_found', [])
-    if 'details' in result and 'patterns_found' in result['details']:
-        patterns = result['details']['patterns_found']
+    patterns = []
+    if 'patterns_found' in result:
+        patterns = result['patterns_found']
+    elif 'details' in result:
+        details = result['details']
+        if isinstance(details, dict):
+            patterns = details.get('patterns_found', details.get('detected_patterns', []))
     elif 'detected_patterns' in result:
         patterns = result['detected_patterns']
     
+    # Ensure patterns is a list
+    if not isinstance(patterns, list):
+        patterns = []
+    
+    # Get severity from result or determine from confidence
+    severity = result.get('severity', 'unknown')
+    if severity == 'unknown':
+        if score >= 0.8:
+            severity = 'critical'
+        elif score >= 0.6:
+            severity = 'high'
+        elif score >= 0.4:
+            severity = 'medium'
+        else:
+            severity = 'low'
+    
+    # Build description
+    if patterns:
+        description = f"A potential code injection pattern was found with a threat score of {score:.2f}. Detected {len(patterns)} suspicious pattern(s)."
+    else:
+        description = f"A potential code injection threat was detected with a confidence of {score:.2f}."
+    
+    # Build details dict
+    details_dict = {
+        "type": "code_injection",
+        "vulnerable_string": text[:500],  # Truncate for safety
+        "score": float(score),
+        "confidence": float(score),
+        "status": status,
+        "severity": severity,
+        "recommendation": "Ensure all user inputs are rigorously sanitized. Use parameterized queries or prepared statements for database interactions."
+    }
+    
+    # Add patterns if found
+    if patterns:
+        details_dict["patterns_found"] = patterns[:10]  # Limit to first 10
+        if len(patterns) > 10:
+            details_dict["additional_patterns_count"] = len(patterns) - 10
+    
+    # Add any additional info from ML model or rule-based detector
+    if 'details' in result and isinstance(result['details'], dict):
+        for key in ['fallback_used', 'ml_prediction', 'rule_based_prediction']:
+            if key in result['details']:
+                details_dict[key] = result['details'][key]
+    
     return AlertCreate(
-        title="Code Injection Vulnerability",
-        description=f"A potential code injection pattern was found with a threat score of {score:.2f}.",
-        severity="Critical",
+        title="Code Injection Vulnerability Detected",
+        description=description,
+        severity="Critical" if score >= 0.7 else "High",
         source="Code Injection Detector",
-        details={
-            "type": "code_injection",
-            "vulnerable_string": text[:500],
-            "score": score,
-            "patterns_found": patterns,
-            "severity": result.get('severity', 'unknown'),
-            "recommendation": "Ensure all user inputs are rigorously sanitized. Use parameterized queries or prepared statements for database interactions."
-        }
+        details=details_dict
     )
 
 def format_malicious_file_alert(file_name: str, result: Dict[str, Any]) -> AlertCreate:

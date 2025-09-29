@@ -416,7 +416,6 @@ async def comprehensive_analysis(
         else:
             overall_risk = 0.0
 
-        # Generate alerts for high-risk findings
         alerts_created = []
 
         # Alert for sensitive data
@@ -428,23 +427,44 @@ async def comprehensive_analysis(
                 if alert_result.get("status") == "success":
                     alerts_created.append("sensitive_data")
 
-        # Alert for phishing
+        # Alert for phishing - IMPROVED LOGIC
         if "error" not in results["phishing"]:
-            phishing_status = results["phishing"].get("status", "")
-            if phishing_status == "Phishing":
-                alert = alerting.format_phishing_alert(analysis_text, results["phishing"])
+            phishing_result = results["phishing"]
+            phishing_status = phishing_result.get("status", "")
+            is_phishing = phishing_result.get("is_phishing", False)
+            
+            # Check multiple indicators for phishing
+            if phishing_status == "Phishing" or is_phishing:
+                alert = alerting.format_phishing_alert(analysis_text, phishing_result)
                 alert_result = await alerting.create_alert(alert)
                 if alert_result.get("status") == "success":
                     alerts_created.append("phishing")
+                    print(f"✅ Phishing alert created successfully")
 
-        # Alert for code injection
+        # Alert for code injection - FIXED LOGIC
         if "error" not in results["code_injection"]:
-            injection_status = results["code_injection"].get("status", "")
-            if injection_status == "Injection":
-                alert = alerting.format_code_injection_alert(analysis_text, results["code_injection"])
+            injection_result = results["code_injection"]
+            injection_status = injection_result.get("status", "")
+            is_injection = injection_result.get("is_injection", False)
+            confidence = injection_result.get("confidence", 0)
+            
+            # Check multiple indicators for code injection
+            # Include XSS, SQL Injection, and other injection types
+            injection_detected = (
+                injection_status in ["Injection", "XSS", "SQL Injection", "Command Injection"] or
+                is_injection or
+                (confidence > 0.5 and injection_status not in ["Safe", "Clean"])
+            )
+            
+            if injection_detected:
+                print(f"🚨 Code injection detected! Status: {injection_status}, is_injection: {is_injection}, confidence: {confidence}")
+                alert = alerting.format_code_injection_alert(analysis_text, injection_result)
                 alert_result = await alerting.create_alert(alert)
                 if alert_result.get("status") == "success":
                     alerts_created.append("code_injection")
+                    print(f"✅ Code injection alert created successfully")
+            else:
+                print(f"ℹ️ No code injection detected. Status: {injection_status}, confidence: {confidence}")
 
         # Alert for poor data quality
         if "error" not in results["data_quality"]:
@@ -454,6 +474,8 @@ async def comprehensive_analysis(
                 alert_result = await alerting.create_alert(alert)
                 if alert_result.get("status") == "success":
                     alerts_created.append("data_quality")
+
+        print(f"📊 Total alerts created: {len(alerts_created)} - {alerts_created}")
 
         return {
             "analysis_type": "Comprehensive Security Analysis",
