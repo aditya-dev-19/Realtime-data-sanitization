@@ -184,22 +184,8 @@ async def detect_phishing_endpoint(
         result = orch.detect_phishing(data.text)
         
         # Create an alert if phishing is detected
-        if result.get("is_phishing", False):
-            alert = {
-                "alert_type": "phishing_attempt",
-                "severity": "high",
-                "timestamp": datetime.utcnow().isoformat(),
-                "details": {
-                    "suspicious_urls": result.get("suspicious_urls", []),
-                    "confidence": result.get("confidence", 0),
-                    "indicators": [
-                        "suspicious_urls" if result.get("suspicious_urls") else None,
-                        "urgency_keywords" if result.get("contains_urgency_keywords") else None,
-                        "suspicious_sender" if result.get("suspicious_sender") else None
-                    ]
-                },
-                "raw_text": data.text[:500]  # Store first 500 chars for reference
-            }
+        if result.get("is_phishing", False) or result.get("status") == "Phishing":
+            alert = alerting.format_phishing_alert(data.text, result)
             await alerting.create_alert(alert)
             
         return {
@@ -226,21 +212,8 @@ async def detect_code_injection_endpoint(
         result = orch.detect_code_injection(data.text)
         
         # Create an alert if injection is detected
-        if result.get("is_injection", False):
-            alert = {
-                "alert_type": "code_injection_attempt",
-                "severity": "critical",
-                "timestamp": datetime.utcnow().isoformat(),
-                "details": {
-                    "detected_patterns": result.get("detected_patterns", []),
-                    "confidence": result.get("confidence", 0),
-                    "severity_levels": list(set(
-                        pattern.get("severity", "medium") 
-                        for pattern in result.get("detected_patterns", [])
-                    ))
-                },
-                "raw_text": data.text[:500]  # Store first 500 chars for reference
-            }
+        if result.get("is_injection", False) or result.get("status") == "Injection":
+            alert = alerting.format_code_injection_alert(data.text, result)
             await alerting.create_alert(alert)
             
         return {

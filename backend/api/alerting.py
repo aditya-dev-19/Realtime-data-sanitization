@@ -26,21 +26,27 @@ async def create_alert(alert_data: AlertCreate):
 
 def format_phishing_alert(text: str, result: Dict[str, Any]) -> AlertCreate:
     """Formats an alert for a phishing detection event."""
-    confidence_score = result.get('confidence', 0) * 100
+    # Handle both 'confidence' and nested response formats
+    confidence = result.get('confidence', 0)
+    if 'result' in result and isinstance(result['result'], dict):
+        confidence = result['result'].get('confidence', confidence)
+    
+    confidence_score = confidence * 100
 
-    # Handle rule-based results that might have different structure
     details = {
         "type": "phishing",
-        "text_analyzed": text[:500],  # Truncate for brevity
-        "confidence": result.get('confidence'),
+        "text_analyzed": text[:500],
+        "confidence": confidence,
         "recommendation": "Do not click any links or provide personal information. Delete the message immediately."
     }
 
-    # Add rule-based specific details if available
+    # Add indicators from various possible locations
     if 'details' in result:
         details.update(result['details'])
     if 'indicators_found' in result.get('details', {}):
         details["indicators"] = result['details']['indicators_found']
+    if 'suspicious_urls' in result:
+        details["suspicious_urls"] = result['suspicious_urls']
 
     return AlertCreate(
         title="Phishing Attempt Detected",
@@ -54,6 +60,14 @@ def format_code_injection_alert(text: str, result: Dict[str, Any]) -> AlertCreat
     """Formats an alert for a code injection event."""
     # Handle both ML model results (score) and rule-based results (confidence)
     score = result.get('score', result.get('confidence', 0))
+    
+    # Get patterns from various possible locations
+    patterns = result.get('patterns_found', [])
+    if 'details' in result and 'patterns_found' in result['details']:
+        patterns = result['details']['patterns_found']
+    elif 'detected_patterns' in result:
+        patterns = result['detected_patterns']
+    
     return AlertCreate(
         title="Code Injection Vulnerability",
         description=f"A potential code injection pattern was found with a threat score of {score:.2f}.",
@@ -61,9 +75,9 @@ def format_code_injection_alert(text: str, result: Dict[str, Any]) -> AlertCreat
         source="Code Injection Detector",
         details={
             "type": "code_injection",
-            "vulnerable_string": text,
+            "vulnerable_string": text[:500],
             "score": score,
-            "patterns_found": result.get('patterns_found', []),
+            "patterns_found": patterns,
             "severity": result.get('severity', 'unknown'),
             "recommendation": "Ensure all user inputs are rigorously sanitized. Use parameterized queries or prepared statements for database interactions."
         }
