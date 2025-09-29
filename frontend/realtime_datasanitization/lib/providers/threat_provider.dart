@@ -20,6 +20,7 @@ class ThreatProvider with ChangeNotifier {
   String? get error => _error;
   List<ScanResult> get scanHistory => List.unmodifiable(_scanHistory);
   int get totalScans => _scanHistory.length;
+
   bool _determineIsThreat(Map<String, dynamic> analysis) {
     final results = analysis['results'] ?? {};
 
@@ -29,7 +30,7 @@ class ThreatProvider with ChangeNotifier {
     print('Sensitive data: ${results['sensitive_data']}');
     print('Data quality: ${results['data_quality']}');
 
-    // Check for any threats
+    // Check for phishing
     if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       print('🚨 DEBUG: Phishing threat detected');
       return true;
@@ -52,7 +53,7 @@ class ThreatProvider with ChangeNotifier {
       print('💉 DEBUG: Code injection result is null');
     }
 
-    // Check for sensitive data (only if actually sensitive)
+    // Check for sensitive data
     final sensitiveData = results['sensitive_data'];
     final classification = sensitiveData?['classification'];
     print('🔒 DEBUG: Sensitive data check - classification: $classification, has_sensitive_data: ${sensitiveData?['has_sensitive_data'] ?? false}');
@@ -66,7 +67,6 @@ class ThreatProvider with ChangeNotifier {
       return true;
     }
 
-    // Also check the has_sensitive_data flag
     if ((sensitiveData?['has_sensitive_data'] ?? false) == true) {
       print('🔒 DEBUG: Sensitive data threat detected via has_sensitive_data flag');
       return true;
@@ -87,18 +87,15 @@ class ThreatProvider with ChangeNotifier {
   String _determineThreatType(Map<String, dynamic> analysis) {
     final results = analysis['results'] ?? {};
 
-    // Check for phishing
     if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       return 'Phishing Attempt';
     }
 
-    // Check for code injection
     final codeInjection = results['code_injection'];
     if (codeInjection != null && (codeInjection['status'] == 'Injection' || codeInjection['status'] == 'XSS' || (codeInjection['is_injection'] ?? false) == true)) {
       return 'Code Injection Detected';
     }
 
-    // Check for sensitive data (only if actually sensitive)
     final sensitiveData = results['sensitive_data'];
     final classification = sensitiveData?['classification'];
     if (classification != null &&
@@ -108,12 +105,10 @@ class ThreatProvider with ChangeNotifier {
         classification != 'NOT_SENSITIVE') {
       return 'Sensitive Data Found';
     }
-    // Also check has_sensitive_data flag
     if ((sensitiveData?['has_sensitive_data'] ?? false) == true) {
       return 'Sensitive Data Found';
     }
 
-    // Check for poor data quality
     if ((results['data_quality']?['quality_score'] ?? 1.0) < 0.7) {
       return 'Data Quality Issues';
     }
@@ -133,7 +128,6 @@ class ThreatProvider with ChangeNotifier {
       if (phishing?['suspicious_urls'] != null && (phishing['suspicious_urls'] as List).isNotEmpty) {
         final urls = phishing['suspicious_urls'] as List;
         phishingDetails.add('${urls.length} suspicious URL${urls.length > 1 ? 's' : ''} found');
-        // Add first few URLs as examples
         for (int i = 0; i < urls.length && i < 3; i++) {
           phishingDetails.add('  • ${urls[i]}');
         }
@@ -168,12 +162,10 @@ class ThreatProvider with ChangeNotifier {
       if (status == 'Injection' || status == 'XSS' || (codeInjection['is_injection'] ?? false) == true) {
         final injectionDetails = <String>[];
 
-        // Handle different response structures
         if (details != null && details is Map) {
           final patterns = details['patterns_found'] ?? details['detected_patterns'];
           if (patterns != null && patterns is List && patterns.isNotEmpty) {
             injectionDetails.add('${patterns.length} suspicious pattern${patterns.length > 1 ? 's' : ''} detected');
-            // Add first few patterns as examples
             for (int i = 0; i < patterns.length && i < 3; i++) {
               injectionDetails.add('  • ${patterns[i]}');
             }
@@ -194,7 +186,7 @@ class ThreatProvider with ChangeNotifier {
       }
     }
 
-    // Sensitive data details (only if actually detected)
+    // Sensitive data details
     if (results['sensitive_data']?['classification'] != null &&
         results['sensitive_data']['classification'] != 'UNKNOWN' &&
         results['sensitive_data']['classification'] != 'ERROR' &&
@@ -216,7 +208,6 @@ class ThreatProvider with ChangeNotifier {
         threats.add('🔒 Sensitive Data Detected:\n${sensitiveDetails.join('\n')}');
       }
     }
-    // Also check has_sensitive_data flag for additional safety
     else if ((results['sensitive_data']?['has_sensitive_data'] ?? false) == true &&
              results['sensitive_data']?['classification'] != 'UNKNOWN' &&
              results['sensitive_data']?['classification'] != 'ERROR') {
@@ -241,14 +232,12 @@ class ThreatProvider with ChangeNotifier {
     final results = analysis['results'] ?? {};
     final List<String> actions = [];
 
-    // Phishing recommendations
     if ((results['phishing']?['status'] == 'Phishing') || (results['phishing']?['is_phishing'] ?? false) == true) {
       actions.add('Do not click on any links in this content');
       actions.add('Verify the sender before taking any action');
       actions.add('Delete this message immediately');
     }
 
-    // Code injection recommendations
     final codeInjection = results['code_injection'];
     if (codeInjection != null && (codeInjection['status'] == 'Injection' || codeInjection['status'] == 'XSS' || (codeInjection['is_injection'] ?? false) == true)) {
       actions.add('Do not execute this code');
@@ -256,7 +245,6 @@ class ThreatProvider with ChangeNotifier {
       actions.add('Use parameterized queries for database interactions');
     }
 
-    // Sensitive data recommendations
     final sensitiveData = results['sensitive_data'];
     final classification = sensitiveData?['classification'];
     if ((classification != null &&
@@ -270,7 +258,6 @@ class ThreatProvider with ChangeNotifier {
       actions.add('Consider encrypting this data if it needs to be stored');
     }
 
-    // Data quality recommendations
     if ((results['data_quality']?['quality_score'] ?? 1.0) < 0.7) {
       actions.add('Review the data ingestion pipeline');
       actions.add('Ensure data is complete, consistent, and properly formatted');
@@ -281,53 +268,52 @@ class ThreatProvider with ChangeNotifier {
   }
 
   Future<ScanResult?> analyzeText(String text) async {
-  if (text.trim().isEmpty) {
-    _error = 'Please enter some text to analyze';
-    notifyListeners();
-    return null;
-  }
-  
-  _isLoading = true;
-  _error = null;
-  notifyListeners();
-
-  try {
-    final apiService = ApiService();
-    final analysis = await apiService.runComprehensiveAnalysis(text);
-
-    print('📡 DEBUG: Raw analysis response:');
-    print(jsonEncode(analysis));
-
-    final result = ScanResult(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      isThreat: _determineIsThreat(analysis),
-      threatType: _determineThreatType(analysis),
-      threatDetails: _generateThreatDetails(analysis),
-      threatScore: analysis['overall_risk_score'],
-      scannedContentPreview: text.length > 100 ? '${text.substring(0, 100)}...' : text,
-      scanType: 'comprehensive',
-      recommendedActions: _generateRecommendedActions(analysis),
-      rawAnalysis: analysis,
-    );
-
-    print('🎯 DEBUG: Final ScanResult - isThreat: ${result.isThreat}, threatType: ${result.threatType}');
-    print('🎯 DEBUG: Overall risk score: ${analysis['overall_risk_score']}');
+    if (text.trim().isEmpty) {
+      _error = 'Please enter some text to analyze';
+      notifyListeners();
+      return null;
+    }
     
-    _lastScanResult = result;
-    _scanHistory.insert(0, result);
-    return result;
-    
-  } catch (e) {
-    _error = 'Failed to analyze text: $e';
-    debugPrint('Analysis error: $_error');
-    return null;
-  } finally {
-    _isLoading = false;
+    _isLoading = true;
+    _error = null;
     notifyListeners();
-  }
-}
 
-  /// Analyze a file for potential threats using comprehensive analysis
+    try {
+      final apiService = ApiService();
+      final analysis = await apiService.runComprehensiveAnalysis(text);
+
+      print('📡 DEBUG: Raw analysis response:');
+      print(jsonEncode(analysis));
+
+      final result = ScanResult(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        isThreat: _determineIsThreat(analysis),
+        threatType: _determineThreatType(analysis),
+        threatDetails: _generateThreatDetails(analysis),
+        threatScore: analysis['overall_risk_score'],
+        scannedContentPreview: text.length > 100 ? '${text.substring(0, 100)}...' : text,
+        scanType: 'comprehensive',
+        recommendedActions: _generateRecommendedActions(analysis),
+        rawAnalysis: analysis,
+      );
+
+      print('🎯 DEBUG: Final ScanResult - isThreat: ${result.isThreat}, threatType: ${result.threatType}');
+      print('🎯 DEBUG: Overall risk score: ${analysis['overall_risk_score']}');
+      
+      _lastScanResult = result;
+      _scanHistory.insert(0, result);
+      return result;
+      
+    } catch (e) {
+      _error = 'Failed to analyze text: $e';
+      debugPrint('Analysis error: $_error');
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<ScanResult?> analyzeFile(PlatformFile file) async {
     if ((file.bytes == null || file.bytes!.isEmpty) && (file.path == null || file.path!.isEmpty)) {
       _error = 'Selected file is empty or invalid';
@@ -380,14 +366,12 @@ class ThreatProvider with ChangeNotifier {
     }
   }
   
-  /// Clear the scan history
   void clearHistory() {
     _scanHistory.clear();
     _lastScanResult = null;
     notifyListeners();
   }
   
-  // Helper method to format file size
   String _formatFileSize(int? bytes) {
     if (bytes == null) return '0 B';
     if (bytes < 1024) return '$bytes B';
@@ -395,22 +379,46 @@ class ThreatProvider with ChangeNotifier {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
   
-  // Simulate threat detection logic (for demo purposes)
-  bool _simulateThreatDetection(String text) {
-    final lowerText = text.toLowerCase();
-    final suspiciousPatterns = [
-      'password',
-      'credit card',
-      'social security',
-      'ssn',
-      'account number',
-      'bank account',
-      'malware',
-      'virus',
-      'hack',
-      'exploit',
-    ];
-    
-    return suspiciousPatterns.any((pattern) => lowerText.contains(pattern));
+  Future<Map<String, dynamic>?> encryptAndUploadFile(
+    PlatformFile file,
+    {double sensitivityScore = 0.5}
+  ) async {
+    if (file.bytes == null && file.path == null) {
+      _error = 'Selected file is empty or invalid';
+      notifyListeners();
+      return null;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final apiService = ApiService();
+      
+      List<int> fileBytes;
+      if (file.bytes != null) {
+        fileBytes = file.bytes!;
+      } else if (file.path != null) {
+        fileBytes = await File(file.path!).readAsBytes();
+      } else {
+        throw Exception('No file data available');
+      }
+
+      final result = await apiService.encryptAndUploadFile(
+        fileBytes,
+        file.name,
+        sensitivityScore: sensitivityScore,
+      );
+
+      return result;
+    } catch (e) {
+      _error = 'Failed to encrypt and upload file: ${e.toString()}';
+      debugPrint('Encrypt and upload error: $_error');
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

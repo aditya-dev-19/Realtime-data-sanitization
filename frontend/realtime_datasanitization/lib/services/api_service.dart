@@ -442,34 +442,49 @@ Future<Map<String, dynamic>> _makeFormApiRequest(
     }
   }
   
-  // Get System Stats
-  Future<Map<String, dynamic>> getSystemStats() async {
+  // Encrypt and upload file to database
+  Future<Map<String, dynamic>> encryptAndUploadFile(
+    List<int> fileBytes, 
+    String filename,
+    {double sensitivityScore = 0.5}
+  ) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/model-stats'),
-        headers: _headers,
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$_baseUrl/encrypt-upload'),
       );
+      
+      // Add headers
+      _headers.forEach((key, value) {
+        if (key.toLowerCase() != 'content-type') { // Don't set Content-Type for multipart
+          request.headers[key] = value;
+        }
+      });
+      
+      // Add file
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          fileBytes,
+          filename: filename,
+        ),
+      );
+      
+      // Add sensitivity score
+      request.fields['sensitivity_score'] = sensitivityScore.toString();
+      
+      // Send request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
       
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes));
       } else {
-        // Return default stats if the endpoint fails
-        return {
-          'model_stats': {
-            'sensitive_data_model': 'operational',
-            'quality_assessment_model': 'operational',
-            'last_updated': DateTime.now().toIso8601String(),
-          },
-          'system_status': 'operational',
-          'timestamp': DateTime.now().toIso8601String(),
-        };
+        throw Exception('Failed to encrypt and upload file: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error in getSystemStats: $e');
-      return {
-        'error': 'Failed to get system stats: $e',
-        'timestamp': DateTime.now().toIso8601String(),
-      };
+      debugPrint('Error in encryptAndUploadFile: $e');
+      rethrow;
     }
   }
 }

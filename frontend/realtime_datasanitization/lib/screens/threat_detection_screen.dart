@@ -15,6 +15,7 @@ class ThreatDetectionScreen extends StatefulWidget {
 class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
   final TextEditingController _textController = TextEditingController();
   bool _isAnalyzing = false;
+  bool _isEncrypting = false;
   PlatformFile? _selectedFile;
   ScanResult? _scanResult;
 
@@ -46,6 +47,60 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     }
   }
 
+  Future<void> _encryptAndUploadFile() async {
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a file first')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isEncrypting = true;
+    });
+
+    try {
+      final threatProvider = context.read<ThreatProvider>();
+      final result = await threatProvider.encryptAndUploadFile(
+        _selectedFile!,
+        sensitivityScore: 0.5, // Default sensitivity, adjust as needed
+      );
+
+      if (mounted) {
+        if (result != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('File encrypted and uploaded successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to encrypt and upload file'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error encrypting file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEncrypting = false;
+        });
+      }
+    }
+  }
+
   Future<void> _analyzeContent() async {
     if (_textController.text.isEmpty && _selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -60,12 +115,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
 
     try {
       final threatProvider = context.read<ThreatProvider>();
-      
       if (_textController.text.isNotEmpty) {
-        // Analyze text
         _scanResult = await threatProvider.analyzeText(_textController.text);
       } else if (_selectedFile != null) {
-        // Analyze file
         _scanResult = await threatProvider.analyzeFile(_selectedFile!);
       }
 
@@ -106,7 +158,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Text input
             TextField(
               controller: _textController,
               maxLines: 5,
@@ -124,10 +175,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                 }
               },
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // Or divider
+
             const Row(
               children: [
                 Expanded(child: Divider()),
@@ -138,24 +188,45 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                 Expanded(child: Divider()),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
-            // File picker
+
             ElevatedButton.icon(
               onPressed: _pickFile,
               icon: const Icon(Icons.attach_file),
-              label: Text(_selectedFile == null 
-                  ? 'Select a file to analyze' 
+              label: Text(_selectedFile == null
+                  ? 'Select a file to analyze'
                   : 'Selected: ${_selectedFile?.name}'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
-            // Analyze button
+
+            if (_selectedFile != null) ...[
+              ElevatedButton(
+                onPressed: _isEncrypting ? null : _encryptAndUploadFile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: _isEncrypting
+                    ? const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      )
+                    : const Text(
+                        'ENCRYPT & UPLOAD',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             ElevatedButton(
               onPressed: _isAnalyzing ? null : _analyzeContent,
               style: ElevatedButton.styleFrom(
@@ -174,10 +245,9 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                       ),
                     ),
             ),
-            
+
             const SizedBox(height: 32),
-            
-            // Results
+
             if (_scanResult != null) _buildScanResult(_scanResult!)
             else if (_isAnalyzing)
               const Center(child: CircularProgressIndicator())
@@ -213,200 +283,49 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     );
   }
 
-  Widget _buildScanResult(ScanResult result) {
-    final bool isThreat = result.isThreat;
-    final analysis = result.rawAnalysis ?? {};
-    final analyses = analysis['results'] ?? {};
-    final modelArtifacts = analysis['model_artifacts_used'] ?? {};
-    final fileMetadata = analysis['file_metadata'];
+  // Helper methods
+  String _formatFileSize(dynamic size) {
+    if (size == null) return 'Unknown';
 
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isThreat ? Colors.red : Colors.green,
-          width: 2,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Overall Risk Section
-            Row(
-              children: [
-                Icon(
-                  isThreat ? Icons.warning_amber : Icons.check_circle,
-                  color: isThreat ? Colors.orange : Colors.green,
-                  size: 36,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isThreat ? 'Potential Threat Detected!' : 'No Threats Found',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (modelArtifacts.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'AI Models Used: ${modelArtifacts.values.where((used) => used == true).length}/${modelArtifacts.length}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    double bytes = 0;
+    if (size is int) {
+      bytes = size.toDouble();
+    } else if (size is double) {
+      bytes = size;
+    } else if (size is String) {
+      bytes = double.tryParse(size) ?? 0;
+    }
 
-            const SizedBox(height: 16),
+    if (bytes == 0) return '0 B';
 
-            // File Information (if applicable)
-            if (fileMetadata != null) ...[
-              const Text(
-                'File Information:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text('Filename: ${fileMetadata['filename']}'),
-              Text('Size: ${_formatFileSize(fileMetadata['size'])}'),
-              Text('Type: ${fileMetadata['content_type'] ?? 'Unknown'}'),
-              if (analyses['file_analysis'] != null) ...[
-                Text('SHA-256: ${analyses['file_analysis']['file_hash']?.substring(0, 16)}...'),
-              ],
-              const SizedBox(height: 16),
-            ],
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = 0;
+    while (bytes >= 1024 && i < suffixes.length - 1) {
+      bytes /= 1024;
+      i++;
+    }
 
-            if (isThreat) ...[
-              const Text(
-                'Threat Details:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(result.threatDetails ?? 'No additional details available'),
-              const SizedBox(height: 16),
-            ],
-
-            // Detailed Analysis Sections
-            _buildAnalysisSection(
-              title: 'Sensitive Data Analysis',
-              analysis: analyses['sensitive_data'] ?? {},
-              modelUsed: modelArtifacts['sensitive_data_model'] ?? false,
-            ),
-
-            _buildAnalysisSection(
-              title: 'Phishing Detection',
-              analysis: analyses['phishing'] ?? {},
-              modelUsed: modelArtifacts['phishing_model'] ?? false,
-            ),
-
-            _buildAnalysisSection(
-              title: 'Code Injection Analysis',
-              analysis: analyses['code_injection'] ?? {},
-              modelUsed: modelArtifacts['code_injection_model'] ?? false,
-            ),
-
-            _buildAnalysisSection(
-              title: 'Data Quality Assessment',
-              analysis: analyses['data_quality'] ?? {},
-              modelUsed: modelArtifacts['data_quality_model'] ?? false,
-            ),
-
-            // File-specific analysis
-            if (analyses['file_analysis'] != null) ...[
-              _buildAnalysisSection(
-                title: 'File Analysis',
-                analysis: analyses['file_analysis'],
-                modelUsed: true,
-              ),
-            ],
-
-            // Alerts Created
-            if (analysis['alerts_created'] != null && (analysis['alerts_created'] as List).isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Security Alerts Created:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ... (analysis['alerts_created'] as List).map((alert) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.notification_important, size: 16, color: Colors.orange),
-                        const SizedBox(width: 4),
-                        Text(
-                          alert.toString().replaceAll('_', ' ').toUpperCase(),
-                          style: const TextStyle(color: Colors.orange),
-                        ),
-                      ],
-                    ),
-                  )).toList(),
-            ],
-
-            // Recommended Actions
-            if (result.recommendedActions.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Recommended Actions:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...result.recommendedActions.map((action) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.arrow_right, size: 20),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(action)),
-                      ],
-                    ),
-                  )).toList(),
-            ],
-
-            const SizedBox(height: 16),
-
-            // Additional metadata
-            if (result.timestamp != null) ...[
-              const Divider(),
-              Text(
-                'Scanned on: ${_formatDateTime(result.timestamp!)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+    return '${bytes.toStringAsFixed(1)} ${suffixes[i]}';
   }
-  
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatKey(String key) {
+    return key.replaceAll('_', ' ').split(' ').map((word) =>
+      word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : ''
+    ).join(' ');
+  }
+
+  String _formatValue(dynamic value) {
+    if (value == null) return 'N/A';
+    if (value is bool) return value ? 'Yes' : 'No';
+    if (value is List) return value.join(', ');
+    if (value is Map) return value.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+    return value.toString();
+  }
+
   Widget _buildAnalysisSection({required String title, required Map<String, dynamic> analysis, bool modelUsed = false}) {
     return ExpansionTile(
       title: Row(
@@ -451,7 +370,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
       return const Text('No data available');
     }
 
-    // If there's an error in analysis, show it
     if (analysis.containsKey('error')) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -475,7 +393,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
       );
     }
 
-    // Format different types of analysis results
     if (analysis.containsKey('status')) {
       return _buildThreatAnalysisDetails(analysis);
     }
@@ -492,7 +409,6 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
       return _buildFileDetails(analysis);
     }
 
-    // Fallback to key-value pairs for unknown formats
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: analysis.entries.map((entry) {
@@ -733,45 +649,190 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
     );
   }
 
-  String _formatKey(String key) {
-    return key.replaceAll('_', ' ').split(' ').map((word) =>
-      word.isNotEmpty ? word[0].toUpperCase() + word.substring(1) : ''
-    ).join(' ');
-  }
+  Widget _buildScanResult(ScanResult result) {
+    final bool isThreat = result.isThreat;
+    final analysis = result.rawAnalysis ?? {};
+    final analyses = analysis['results'] ?? {};
+    final modelArtifacts = analysis['model_artifacts_used'] ?? {};
+    final fileMetadata = analysis['file_metadata'];
 
-  String _formatValue(dynamic value) {
-    if (value == null) return 'N/A';
-    if (value is bool) return value ? 'Yes' : 'No';
-    if (value is List) return value.join(', ');
-    if (value is Map) return value.entries.map((e) => '${e.key}: ${e.value}').join(', ');
-    return value.toString();
-  }
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isThreat ? Colors.red : Colors.green,
+          width: 2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isThreat ? Icons.warning_amber : Icons.check_circle,
+                  color: isThreat ? Colors.orange : Colors.green,
+                  size: 36,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isThreat ? 'Potential Threat Detected!' : 'No Threats Found',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (modelArtifacts.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'AI Models Used: ${modelArtifacts.values.where((used) => used == true).length}/${modelArtifacts.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
+            const SizedBox(height: 16),
 
-  String _formatFileSize(dynamic size) {
-    if (size == null) return 'Unknown';
+            if (fileMetadata != null) ...[
+              const Text(
+                'File Information:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('Filename: ${fileMetadata['filename']}'),
+              Text('Size: ${_formatFileSize(fileMetadata['size'])}'),
+              Text('Type: ${fileMetadata['content_type'] ?? 'Unknown'}'),
+              if (analyses['file_analysis'] != null) ...[
+                Text('SHA-256: ${analyses['file_analysis']['file_hash']?.substring(0, 16)}...'),
+              ],
+              const SizedBox(height: 16),
+            ],
 
-    double bytes = 0;
-    if (size is int) {
-      bytes = size.toDouble();
-    } else if (size is double) {
-      bytes = size;
-    } else if (size is String) {
-      bytes = double.tryParse(size) ?? 0;
-    }
+            if (isThreat) ...[
+              const Text(
+                'Threat Details:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(result.threatDetails ?? 'No additional details available'),
+              const SizedBox(height: 16),
+            ],
 
-    if (bytes == 0) return '0 B';
+            _buildAnalysisSection(
+              title: 'Sensitive Data Analysis',
+              analysis: analyses['sensitive_data'] ?? {},
+              modelUsed: modelArtifacts['sensitive_data_model'] ?? false,
+            ),
 
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var i = 0;
-    while (bytes >= 1024 && i < suffixes.length - 1) {
-      bytes /= 1024;
-      i++;
-    }
+            _buildAnalysisSection(
+              title: 'Phishing Detection',
+              analysis: analyses['phishing'] ?? {},
+              modelUsed: modelArtifacts['phishing_model'] ?? false,
+            ),
 
-    return '${bytes.toStringAsFixed(1)} ${suffixes[i]}';
+            _buildAnalysisSection(
+              title: 'Code Injection Analysis',
+              analysis: analyses['code_injection'] ?? {},
+              modelUsed: modelArtifacts['code_injection_model'] ?? false,
+            ),
+
+            _buildAnalysisSection(
+              title: 'Data Quality Assessment',
+              analysis: analyses['data_quality'] ?? {},
+              modelUsed: modelArtifacts['data_quality_model'] ?? false,
+            ),
+
+            if (analyses['file_analysis'] != null) ...[
+              _buildAnalysisSection(
+                title: 'File Analysis',
+                analysis: analyses['file_analysis'],
+                modelUsed: true,
+              ),
+            ],
+
+            if (analysis['alerts_created'] != null && (analysis['alerts_created'] as List).isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Security Alerts Created:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ... (analysis['alerts_created'] as List).map((alert) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.notification_important, size: 16, color: Colors.orange),
+                        const SizedBox(width: 4),
+                        Text(
+                          alert.toString().replaceAll('_', ' ').toUpperCase(),
+                          style: const TextStyle(color: Colors.orange),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+            ],
+
+            if (result.recommendedActions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Recommended Actions:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...result.recommendedActions.map((action) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.arrow_right, size: 20),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(action)),
+                      ],
+                    ),
+                  )).toList(),
+            ],
+
+            const SizedBox(height: 16),
+
+            if (result.timestamp != null) ...[
+              const Divider(),
+              Text(
+                'Scanned on: ${_formatDateTime(result.timestamp!)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
