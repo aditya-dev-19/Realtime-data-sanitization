@@ -431,7 +431,7 @@ class ThreatProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final history = await _apiService.getFileHistory();
+      final history = await _apiService.getFileHistory(); // Corrected method name
       _fileHistory = List<Map<String, dynamic>>.from(history);
     } catch (e) {
       _error = 'Failed to fetch file history: $e';
@@ -447,7 +447,7 @@ class ThreatProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      return await _apiService.downloadAndDecryptFile(firestoreDocId);
+      return await _apiService.downloadAndDecryptFile(firestoreDocId); // Corrected method name
     } catch (e) {
       _error = 'Failed to download file: $e';
       debugPrint('File download error: $_error');

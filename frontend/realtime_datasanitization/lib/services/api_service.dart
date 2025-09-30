@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -487,8 +488,8 @@ Future<Map<String, dynamic>> _makeFormApiRequest(
       rethrow;
     }
   }
-}
- // Get file history
+
+  // Get file history
   Future<List<dynamic>> getFileHistory() async {
     try {
       final response = await http.get(
@@ -526,3 +527,4 @@ Future<Map<String, dynamic>> _makeFormApiRequest(
       rethrow;
     }
   }
+}

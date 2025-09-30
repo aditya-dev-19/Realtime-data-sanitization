@@ -11,7 +11,7 @@ from .orchestrator import CybersecurityOrchestrator
 from .routers import users, alerts
 from .firebase_admin import db
 from . import alerting  # Import the new centralized alerting module
-from .storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc
+from .storage_handler import encrypt_and_upload_file, download_and_decrypt_file_by_doc, FIRESTORE_COLLECTION
 from fastapi.responses import JSONResponse, Response
 # --- Global Orchestrator ---
 orchestrator: CybersecurityOrchestrator = None

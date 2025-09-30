@@ -1,14 +1,12 @@
-// frontend/realtime_datasanitization/lib/screens/file_history_screen.dart
+// lib/screens/history_screen.dart
 
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-// ignore: depend_on_referenced_packages
-import 'package:open_file/open_file.dart';
-// ignore: depend_on_referenced_packages
+import 'package:open_file/open_file.dart'; // Correct import
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
+import 'package:provider/provider.dart';
 
 import '../providers/threat_provider.dart';
 
