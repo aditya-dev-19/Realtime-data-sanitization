@@ -488,3 +488,41 @@ Future<Map<String, dynamic>> _makeFormApiRequest(
     }
   }
 }
+ // Get file history
+  Future<List<dynamic>> getFileHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/files'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        return data['files'];
+      } else {
+        throw Exception('Failed to load file history: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching file history: $e');
+      rethrow;
+    }
+  }
+
+  // Download and decrypt file
+  Future<Uint8List> downloadAndDecryptFile(String firestoreDocId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/download-decrypt?firestore_doc_id=$firestoreDocId'),
+        headers: _headers,
+      );
+
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        throw Exception('Failed to download and decrypt file: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading file: $e');
+      rethrow;
+    }
+  }

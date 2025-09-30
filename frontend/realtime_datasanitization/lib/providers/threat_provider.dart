@@ -421,4 +421,40 @@ class ThreatProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  List<Map<String, dynamic>> _fileHistory = [];
+  List<Map<String, dynamic>> get fileHistory => _fileHistory;
+
+  Future<void> fetchFileHistory() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final history = await _apiService.getFileHistory();
+      _fileHistory = List<Map<String, dynamic>>.from(history);
+    } catch (e) {
+      _error = 'Failed to fetch file history: $e';
+      debugPrint('File history error: $_error');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Uint8List?> downloadFile(String firestoreDocId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      return await _apiService.downloadAndDecryptFile(firestoreDocId);
+    } catch (e) {
+      _error = 'Failed to download file: $e';
+      debugPrint('File download error: $_error');
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

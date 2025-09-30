@@ -1,150 +1,78 @@
-import 'package:flutter/material.dart';
+// frontend/realtime_datasanitization/lib/screens/file_history_screen.dart
 
-class HistoryScreen extends StatelessWidget {
-  const HistoryScreen({super.key});
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+// ignore: depend_on_referenced_packages
+import 'package:open_file/open_file.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+import '../providers/threat_provider.dart';
+
+class FileHistoryScreen extends StatefulWidget {
+  const FileHistoryScreen({super.key});
+
+  @override
+  State<FileHistoryScreen> createState() => _FileHistoryScreenState();
+}
+
+class _FileHistoryScreenState extends State<FileHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Provider.of<ThreatProvider>(context, listen: false).fetchFileHistory();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> historyItems = [
-      {
-        "file": "final_report_q3_2025.docx",
-        "status": "No Threats",
-        "statusColor": "green",
-        "date": "Sep 1"
-      },
-      {
-        "file": "My credit card is 4111-XXXX-XXXX-1234, please...",
-        "status": "PII Found",
-        "statusColor": "orange",
-        "date": "Aug 31"
-      },
-      {
-        "file": "Click this link for a free prize: http://shady.link/giveaway",
-        "status": "Malicious Detected",
-        "statusColor": "red",
-        "date": "Aug 29"
-      },
-      {
-        "file": "project_alpha_source_code.zip",
-        "status": "No Threats",
-        "statusColor": "green",
-        "date": "Aug 27"
-      },
-      {
-        "file": "Meeting notes from our sync yesterday about the launch...",
-        "status": "No Threats",
-        "statusColor": "green",
-        "date": "Aug 22"
-      },
-      {
-        "file": "urgent_invoice_payment.pdf",
-        "status": "Malicious Detected",
-        "statusColor": "red",
-        "date": "Aug 20"
-      },
-    ];
-
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1B2E), // Dark blue background like dashboard
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0A1B2E),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "History",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white, // same as Dashboard headline
-          ),
-        ),
+        title: const Text('File History'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // 🔍 Search bar
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Search scans...",
-                hintStyle: const TextStyle(color: Colors.white70),
-                prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                filled: true,
-                fillColor: const Color(0xFF112A45),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: Consumer<ThreatProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading && provider.fileHistory.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.fileHistory.isEmpty) {
+            return const Center(child: Text('No file history found.'));
+          }
+
+          return ListView.builder(
+            itemCount: provider.fileHistory.length,
+            itemBuilder: (context, index) {
+              final file = provider.fileHistory[index];
+              return ListTile(
+                title: Text(file['original_filename']),
+                subtitle: Text('ID: ${file['firestore_doc_id']}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.download),
+                  onPressed: () async {
+                    final downloadedBytes = await provider.downloadFile(file['firestore_doc_id']);
+                    if (downloadedBytes != null) {
+                      final tempDir = await getTemporaryDirectory();
+                      final filePath = '${tempDir.path}/${file['original_filename']}';
+                      final fileHandle = File(filePath);
+                      await fileHandle.writeAsBytes(downloadedBytes);
+                      OpenFile.open(filePath);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to download file.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
                 ),
-              ),
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 16),
-
-            // 📂 History list
-            Expanded(
-              child: ListView.builder(
-                itemCount: historyItems.length,
-                itemBuilder: (context, index) {
-                  final item = historyItems[index];
-                  Color statusColor;
-                  switch (item["statusColor"]) {
-                    case "green":
-                      statusColor = Colors.green;
-                      break;
-                    case "orange":
-                      statusColor = Colors.orange;
-                      break;
-                    case "red":
-                      statusColor = Colors.red;
-                      break;
-                    default:
-                      statusColor = Colors.white;
-                  }
-
-                  return Card(
-                    color: const Color(0xFF112A45), // Matches dashboard cards
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.insert_drive_file,
-                        color: Colors.blue[300],
-                        size: 32,
-                      ),
-                      title: Text(
-                        item["file"]!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        item["status"]!,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      trailing: Text(
-                        item["date"]!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }

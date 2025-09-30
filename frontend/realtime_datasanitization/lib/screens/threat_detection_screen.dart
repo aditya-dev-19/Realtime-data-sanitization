@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/threat_provider.dart';
 import '../models/scan_result.dart';
+import 'history_screen.dart'; // Import the new screen
 
 class ThreatDetectionScreen extends StatefulWidget {
   const ThreatDetectionScreen({super.key});
@@ -167,7 +168,11 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
-              // TODO: Navigate to scan history
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const FileHistoryScreen(),
+                ),
+              );
             },
           ),
         ],

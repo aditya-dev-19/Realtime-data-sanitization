@@ -612,6 +612,22 @@ async def download_and_decrypt_file(firestore_doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to download and decrypt file: {str(e)}")
 
+@app.get("/files", tags=["Files"])
+async def list_files():
+    """
+    Lists all file metadata from Firestore.
+    """
+    try:
+        collection_ref = db.collection(FIRESTORE_COLLECTION)
+        docs = collection_ref.stream()
+        files = []
+        for doc in docs:
+            file_data = doc.to_dict()
+            file_data['firestore_doc_id'] = doc.id
+            files.append(file_data)
+        return {"files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list files: {str(e)}")
 # --- Include API Routers ---
 app.include_router(alerts.router)
 app.include_router(users.router)
