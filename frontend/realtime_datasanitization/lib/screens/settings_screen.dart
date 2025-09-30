@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/cupertino.dart';
 import '../providers/system_status_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart'; // ADD THIS IMPORT
 import 'login_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -64,7 +65,6 @@ class SettingsScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    // Show confirmation dialog
                     final shouldLogout = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -87,10 +87,8 @@ class SettingsScreen extends StatelessWidget {
                     );
 
                     if (shouldLogout == true) {
-                      // Sign out the user
                       await context.read<AuthProvider>().logout();
                       
-                      // Navigate to login screen and remove all previous routes
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -133,26 +131,6 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(height: 32),
-            
-            // Logout button
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Implement logout
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('Sign Out'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -174,12 +152,20 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildThemeSetting(BuildContext context) {
-    return SwitchListTile(
-      title: const Text('Dark Mode'),
-      subtitle: const Text('Use dark theme'),
-      value: Theme.of(context).brightness == Brightness.dark,
-      onChanged: (bool value) {
-        // TODO: Implement theme switching
+    // Use Consumer to listen to ThemeProvider changes
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        final isDark = themeProvider.themeMode == ThemeMode.dark;
+        
+        return SwitchListTile(
+          title: const Text('Dark Mode'),
+          subtitle: const Text('Use dark theme'),
+          value: isDark,
+          onChanged: (bool value) {
+            // Toggle the theme when switch is changed
+            themeProvider.toggleTheme();
+          },
+        );
       },
     );
   }

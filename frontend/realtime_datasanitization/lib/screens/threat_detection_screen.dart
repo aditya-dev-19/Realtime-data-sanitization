@@ -252,6 +252,7 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
               onPressed: _isAnalyzing ? null : _analyzeContent,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isAnalyzing
@@ -263,6 +264,7 @@ class _ThreatDetectionScreenState extends State<ThreatDetectionScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
             ),

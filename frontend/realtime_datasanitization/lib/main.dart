@@ -8,6 +8,7 @@ import 'providers/system_status_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/alerts_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart'; 
 
 // Screens
 import 'screens/dashboard_screen.dart';
@@ -32,6 +33,7 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         // Core providers
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => SystemStatusProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
@@ -48,47 +50,86 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AI Cybersecurity',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.dark(
-          primary: Colors.blue,
-          background: const Color(0xFF0A1A2F),
-          surface: const Color(0xFF1E1E2E),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0A1A2F),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0A1A2F),
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    // final themeProvider = Provider.of<ThemeProvider>(context);
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'AI Cybersecurity',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeProvider.themeMode,
+          // 5. Define the light theme
+          theme: ThemeData(
+            useMaterial3: true,
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue,
+              background: const Color(0xFFF0F2F5),
+              surface: Colors.white,
+            ),
+            scaffoldBackgroundColor: const Color(0xFFF0F2F5),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              elevation: 1,
+              centerTitle: true,
+              titleTextStyle: TextStyle(
+                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            cardTheme: CardThemeData(
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+            ),
+            bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+              backgroundColor: Colors.white,
+              selectedItemColor: Colors.blue,
+              unselectedItemColor: Colors.grey,
+              type: BottomNavigationBarType.fixed,
+            ),
           ),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF1E2C42),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            colorScheme: ColorScheme.dark(
+              primary: Colors.blue,
+              background: const Color(0xFF0A1A2F),
+              surface: const Color(0xFF1E1E2E),
+            ),
+            scaffoldBackgroundColor: const Color(0xFF0A1A2F),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF0A1A2F),
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            cardTheme: CardThemeData(
+              color: const Color(0xFF1E2C42),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+            ),
+            bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+              backgroundColor: Color(0xFF0F2A48),
+              selectedItemColor: Colors.blue,
+              unselectedItemColor: Colors.grey,
+              type: BottomNavigationBarType.fixed,
+            ),
           ),
-          elevation: 2,
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF0F2A48),
-          selectedItemColor: Colors.blue,
-          unselectedItemColor: Colors.grey,
-          type: BottomNavigationBarType.fixed,
-        ),
-      ),
-      home: const AuthWrapper(),
-      routes: {
-        '/home': (context) => const MyAppContent(),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegistrationScreen(),
-      },
+          home: const AuthWrapper(),
+          routes: {
+            '/home': (context) => const MyAppContent(),
+            '/login': (context) => const LoginScreen(),
+            '/register': (context) => const RegistrationScreen(),
+          },
+        );
+      }
     );
   }
 }

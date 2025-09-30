@@ -17,7 +17,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch all necessary data when the screen loads
     Future.microtask(() {
       context.read<DashboardProvider>().fetchDashboardData();
       context.read<AlertsProvider>().fetchAlerts();
@@ -63,13 +62,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Expanded(
       child: Card(
-        color: const Color(0xFF1E2C42),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -91,8 +88,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 12),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
@@ -101,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 title,
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
                   fontSize: 14,
                 ),
               ),
@@ -127,7 +124,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  List<Widget> _buildComponentStatus(Map<String, dynamic> components) {
+  List<Widget> _buildComponentStatus(BuildContext context, Map<String, dynamic> components) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final List<Widget> statusWidgets = [];
     
     components.forEach((key, value) {
@@ -136,14 +134,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       IconData statusIcon;
       String displayStatus = status;
       
-      // Special handling for database errors
       if (key == 'Database' && status.contains('error:')) {
         statusColor = Colors.red;
         statusIcon = Icons.error_outline;
         displayStatus = 'error';
-      } 
-      // Normal status handling
-      else if (status == 'ok' || status == 'true' || status == 'enabled' || status == 'loaded') {
+      } else if (status == 'ok' || status == 'true' || status == 'enabled' || status == 'loaded') {
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
         displayStatus = 'ok';
@@ -158,7 +153,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         statusIcon = Icons.help_outline;
       }
       
-      // Format the key for display (convert snake_case to Title Case)
       final displayKey = key.split('_')
           .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
           .join(' ');
@@ -172,8 +166,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(width: 8),
               Text(
                 displayKey,
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black87,
                   fontSize: 14,
                 ),
               ),
@@ -200,9 +194,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dashboardProvider = context.watch<DashboardProvider>();
     final alertsProvider = context.watch<AlertsProvider>();
     final systemStatusProvider = context.watch<SystemStatusProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF0A1A2F),
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
@@ -222,29 +216,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Dashboard',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: isDark ? Colors.white : Colors.black87,
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'Welcome back!',
                           style: TextStyle(
-                            color: Colors.grey,
+                            color: isDark ? Colors.grey : Colors.grey[600],
                             fontSize: 14,
                           ),
                         ),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      icon: Icon(
+                        Icons.refresh,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       onPressed: () {
                         dashboardProvider.fetchDashboardData();
                         alertsProvider.fetchAlerts();
@@ -257,19 +254,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // System Status Card
                 Card(
-                  color: const Color(0xFF1E2C42),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'System Status',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: isDark ? Colors.white : Colors.black87,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -284,8 +277,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Expanded(
                               child: Text(
                                 systemStatusProvider.systemStatus?['details'] ?? 'Checking system status...',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black87,
                                   fontSize: 14,
                                 ),
                               ),
@@ -293,17 +286,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Component Status
-                        const Text(
+                        Text(
                           'Component Status',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: isDark ? Colors.white70 : Colors.black54,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ..._buildComponentStatus({
+                        ..._buildComponentStatus(context, {
                           'Database': systemStatusProvider.systemStatus?['components']?['database'] ?? 'unknown',
                           'Orchestrator': systemStatusProvider.systemStatus?['components']?['orchestrator'] ?? 'unknown',
                           'Network Traffic': systemStatusProvider.systemStatus?['components']?['network_traffic'] ?? 'unknown',
@@ -319,6 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     _buildStatCard(
+                      context,
                       'Data Classification',
                       (systemStatusProvider.systemStatus?['components']?['data_classification']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.security,
@@ -328,6 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
+                      context,
                       'Database',
                       (systemStatusProvider.systemStatus?['components']?['database']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.storage,
@@ -341,6 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     _buildStatCard(
+                      context,
                       'Orchestrator',
                       (systemStatusProvider.systemStatus?['components']?['orchestrator']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.sync,
@@ -350,6 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(width: 16),
                     _buildStatCard(
+                      context,
                       'Network',
                       (systemStatusProvider.systemStatus?['components']?['network_traffic']?.toString() ?? 'UNKNOWN').toUpperCase(),
                       Icons.network_check,
@@ -365,10 +361,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Recent Alerts',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: isDark ? Colors.white : Colors.black87,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -385,14 +381,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                ...alertsProvider.alerts.take(3).map((alert) => _buildAlertItem(alert)).toList(),
+                ...alertsProvider.alerts.take(3).map((alert) => _buildAlertItem(context, alert)).toList(),
                 if (alertsProvider.alerts.isEmpty)
-                  const Center(
+                  Center(
                     child: Padding(
-                      padding: EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(16.0),
                       child: Text(
                         'No recent alerts',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(
+                          color: isDark ? Colors.grey : Colors.grey[600],
+                        ),
                       ),
                     ),
                   ),
@@ -404,14 +402,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildAlertItem(Alert alert) {
+  Widget _buildAlertItem(BuildContext context, Alert alert) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final severityStr = alert.severity.toString().split('.').last;
+    
     return Card(
-      color: const Color(0xFF1E2C42),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: _getSeverityColor(alert.severity.toString().split('.').last).withOpacity(0.5),
+          color: _getSeverityColor(severityStr).withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -422,12 +422,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _getSeverityColor(alert.severity.toString().split('.').last).withOpacity(0.2),
+                color: _getSeverityColor(severityStr).withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                _getSeverityIcon(alert.severity.toString().split('.').last),
-                color: _getSeverityColor(alert.severity.toString().split('.').last),
+                _getSeverityIcon(severityStr),
+                color: _getSeverityColor(severityStr),
                 size: 20,
               ),
             ),
@@ -438,8 +438,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text(
                     alert.title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -447,7 +447,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     alert.description ?? 'No description',
                     style: TextStyle(
-                      color: Colors.grey[400],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                       fontSize: 14,
                     ),
                     maxLines: 2,
@@ -457,7 +457,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     _formatTimeAgo(alert.timestamp),
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: isDark ? Colors.grey[600] : Colors.grey[500],
                       fontSize: 12,
                     ),
                   ),
@@ -465,7 +465,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.chevron_right, color: Colors.grey),
+              icon: Icon(
+                Icons.chevron_right,
+                color: isDark ? Colors.grey : Colors.grey[600],
+              ),
               onPressed: () {
                 // Handle alert tap
               },
@@ -522,47 +525,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
       default:
         return Icons.info_outline;
     }
-  }
-}
-
-// Analyze Text Screen
-class AnalyzeTextScreen extends StatelessWidget {
-  const AnalyzeTextScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D2B),
-      appBar: AppBar(
-        title: const Text("Analyze Text"),
-      ),
-      body: const Center(
-        child: Text(
-          "Analyze Text Screen",
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-      ),
-    );
-  }
-}
-
-// Scan Screen
-class ScanScreen extends StatelessWidget {
-  const ScanScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0D2B),
-      appBar: AppBar(
-        title: const Text("Scan"),
-      ),
-      body: const Center(
-        child: Text(
-          "Scan Screen",
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-      ),
-    );
   }
 }
